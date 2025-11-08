@@ -1,8 +1,10 @@
 // src/services/api.js
-// Local mock API with persistent data in localStorage
-/* ===========================================
-   LOCAL MOCK DATABASE INITIALIZATION
-=========================================== */
+// SwarSethu — Mock Local API for Artist Scheduling & Collaboration
+
+// ============================
+// Local Database (in localStorage)
+// ============================
+
 let registeredArtists =
   JSON.parse(localStorage.getItem("artists")) ||
   [
@@ -15,9 +17,9 @@ let invitations = JSON.parse(localStorage.getItem("invitations")) || [];
 let sessions = JSON.parse(localStorage.getItem("sessions")) || [];
 let currentUserEmail = localStorage.getItem("currentUserEmail") || "kumar@mail.com";
 
-/* ===========================================
-   SAVE TO LOCALSTORAGE
-=========================================== */
+// ============================
+// Save to localStorage
+// ============================
 function save() {
   localStorage.setItem("artists", JSON.stringify(registeredArtists));
   localStorage.setItem("invitations", JSON.stringify(invitations));
@@ -25,21 +27,33 @@ function save() {
   localStorage.setItem("currentUserEmail", currentUserEmail);
 }
 
-/* ===========================================
-   USER CONTEXT HELPERS
-=========================================== */
+// ============================
+// Current User
+// ============================
 export function getCurrentUser() {
   return registeredArtists.find((a) => a.email === currentUserEmail);
 }
 
+// ✅ Updated setCurrentUser with Event Dispatch
 export function setCurrentUser(email) {
   currentUserEmail = email;
   save();
+
+  // Dispatch event for components to reload when user changes
+  try {
+    window.dispatchEvent(
+      new CustomEvent("swarsethu:userChanged", { detail: { email } })
+    );
+  } catch (e) {
+    const ev = document.createEvent("Event");
+    ev.initEvent("swarsethu:userChanged", true, true);
+    window.dispatchEvent(ev);
+  }
 }
 
-/* ===========================================
-   1. REGISTER ARTIST
-=========================================== */
+// ============================
+// Artist Management
+// ============================
 export async function registerArtist({ name, email, role }) {
   const newArtist = {
     id: `a_${Date.now()}`,
@@ -48,14 +62,15 @@ export async function registerArtist({ name, email, role }) {
     role,
   };
   registeredArtists.push(newArtist);
-  setCurrentUser(email); // auto-login after registration
+  setCurrentUser(email);
   save();
   return newArtist;
 }
 
-/* ===========================================
-   2. GET ARTISTS (filter / search)
-=========================================== */
+export async function getAllArtists() {
+  return new Promise((resolve) => setTimeout(() => resolve([...registeredArtists]), 150));
+}
+
 export async function getArtists(role = "", q = "") {
   const filtered = registeredArtists.filter(
     (a) =>
@@ -65,18 +80,6 @@ export async function getArtists(role = "", q = "") {
   return new Promise((resolve) => setTimeout(() => resolve(filtered), 200));
 }
 
-/* ===========================================
-   3. GET ALL REGISTERED ARTISTS
-=========================================== */
-export async function getAllArtists() {
-  return new Promise((resolve) =>
-    setTimeout(() => resolve([...registeredArtists]), 200)
-  );
-}
-
-/* ===========================================
-   4. GET ARTISTS / INVITES BY ROLE
-=========================================== */
 export async function getByRole(role = "") {
   const artistsFiltered = registeredArtists.filter(
     (a) => !role || a.role.toLowerCase() === role.toLowerCase()
@@ -92,9 +95,9 @@ export async function getByRole(role = "") {
   );
 }
 
-/* ===========================================
-   5. GET CONCERTS (mock)
-=========================================== */
+// ============================
+// Concerts (Predefined Mock List)
+// ============================
 export async function getConcerts() {
   return [
     {
@@ -109,23 +112,43 @@ export async function getConcerts() {
       description: "Festival special",
       venue: "Main Stage",
     },
+    {
+      id: "c3",
+      title: "Carnatic Fusion Night",
+      description: "Cultural fusion concert",
+      venue: "Music Academy",
+    },
   ];
 }
 
-/* ===========================================
-   6. CREATE SESSION (Send invites)
-   - stores sender email/name/role on each invite
-   - accepts payload.concert_title or looks up by id
-=========================================== */
+// ============================
+// Create Session (Send Invites)
+// ============================
 export async function createSession(payload) {
   const sender = getCurrentUser();
-  if (!sender) {
-    const fallbackEmail =
-      localStorage.getItem("currentUserEmail") || "unknown@mail.com";
-    throw new Error(`No current user found for email: ${fallbackEmail}`);
+  if (!sender) throw new Error("No current user found");
+
+  // Validate venue & date/time
+  if (!payload.venue || !payload.date_time) {
+    throw new Error("Venue and Date/Time are mandatory to schedule a concert.");
   }
 
-  // determine concert title (prefer payload.concert_title, else lookup)
+  // Check if any invited artist is already busy at that time
+  const existingInvites = JSON.parse(localStorage.getItem("invitations")) || [];
+  const conflicting = existingInvites.filter(
+    (inv) =>
+      inv.date_time === payload.date_time &&
+      inv.status === "accepted" &&
+      payload.invites.some((i) => i.user_id === inv.invited_user_id)
+  );
+  if (conflicting.length > 0) {
+    const busyArtists = conflicting.map((c) => c.invited_user_id).join(", ");
+    throw new Error(
+      `Cannot send invites. The following artists are already booked for this time: ${busyArtists}`
+    );
+  }
+
+  // Find concert title if not provided
   let concertTitle = payload.concert_title || null;
   if (!concertTitle && payload.concert_id) {
     const concerts = await getConcerts();
@@ -138,15 +161,17 @@ export async function createSession(payload) {
     id: `s_${Date.now()}`,
     concert_id: payload.concert_id,
     concert_title: concertTitle,
-    date_time: payload.date_time || null,
-    venue: payload.venue || null,
+    date_time: payload.date_time,
+    venue: payload.venue,
     invites: payload.invites || [],
     created_by: sender.email,
     created_at: new Date().toISOString(),
   };
   sessions.push(session);
 
+  // Create invitation entries
   payload.invites.forEach((inv) => {
+    const artist = registeredArtists.find((a) => a.id === inv.user_id);
     const inviteObj = {
       id: `i_${Date.now()}_${inv.user_id}`,
       session_id: session.id,
@@ -155,15 +180,15 @@ export async function createSession(payload) {
       priority: inv.priority,
       role: inv.role,
       concert_id: payload.concert_id,
-      title: payload.concert_title
-        ? `Invitation: ${payload.concert_title}`
-        : `Invitation: ${concertTitle}`,
+      title: `Invitation: ${concertTitle}`,
       sent_by: sender.email,
-      sent_by_name: sender.name || sender.email.split("@")[0],
-      sent_by_role: sender.role || "Unknown",
+      sent_by_name: sender.name,
+      sent_by_role: sender.role,
       created_at: new Date().toISOString(),
-      venue: session.venue || null,
-      concert_title: session.concert_title,
+      venue: session.venue,
+      concert_title: concertTitle,
+      date_time: session.date_time,
+      invited_user_name: artist ? artist.name : "Unknown",
     };
     invitations.push(inviteObj);
   });
@@ -172,9 +197,9 @@ export async function createSession(payload) {
   return session;
 }
 
-/* ===========================================
-   7. GET DASHBOARD (for current artist)
-=========================================== */
+// ============================
+// Dashboard Data
+// ============================
 export async function getDashboard() {
   const user = getCurrentUser();
   if (!user) throw new Error("No current user");
@@ -191,10 +216,9 @@ export async function getDashboard() {
   };
 }
 
-/* ===========================================
-   8. RESPOND TO INVITATION (Accept/Decline)
-   - creates notification for sender with context
-=========================================== */
+// ============================
+// Respond to Invitation
+// ============================
 export async function respondInvitation(inviteId, status) {
   const idx = invitations.findIndex((i) => i.id === inviteId);
   if (idx === -1) throw new Error("Invitation not found");
@@ -202,17 +226,19 @@ export async function respondInvitation(inviteId, status) {
   invitations[idx].status = status;
   invitations[idx].responded_at = new Date().toISOString();
 
-  // create notification for sender
   const senderEmail = invitations[idx].sent_by;
   const receiver = getCurrentUser();
   const concertTitle =
     invitations[idx].concert_title || invitations[idx].title || invitations[idx].concert_id;
   const venue = invitations[idx].venue || "";
+  const dateTime = invitations[idx].date_time
+    ? new Date(invitations[idx].date_time).toLocaleString()
+    : "N/A";
 
   const note = {
     id: `n_${Date.now()}`,
     to: senderEmail,
-    message: `${receiver.name} (${receiver.role}) has ${status} the invitation for "${concertTitle}"${venue ? ` at ${venue}` : ""}`,
+    message: `${receiver.name} (${receiver.role}) has ${status} the invitation for "${concertTitle}" at ${venue} on ${dateTime}`,
     time: new Date().toISOString(),
     invite_id: inviteId,
     session_id: invitations[idx].session_id,
@@ -226,26 +252,31 @@ export async function respondInvitation(inviteId, status) {
   return { invitation: invitations[idx] };
 }
 
-/* ===========================================
-   9. GET NOTIFICATIONS (for sender)
-=========================================== */
+// ============================
+// Notifications
+// ============================
 export async function getNotifications(email) {
   const all = JSON.parse(localStorage.getItem("notifications")) || [];
   return all.filter((n) => n.to === email).reverse();
 }
 
-/* ===========================================
-   10. CLEAR NOTIFICATIONS
-=========================================== */
 export async function clearNotifications(email) {
   const all = JSON.parse(localStorage.getItem("notifications")) || [];
   const filtered = all.filter((n) => n.to !== email);
   localStorage.setItem("notifications", JSON.stringify(filtered));
 }
 
-/* ===========================================
-   11. RESET MOCK DATA
-=========================================== */
+// ============================
+// Utility Functions
+// ============================
+export async function getAllSessions() {
+  return JSON.parse(localStorage.getItem("sessions")) || [];
+}
+
+export async function getAllInvitations() {
+  return JSON.parse(localStorage.getItem("invitations")) || [];
+}
+
 export function resetMockData() {
   registeredArtists = [];
   invitations = [];
