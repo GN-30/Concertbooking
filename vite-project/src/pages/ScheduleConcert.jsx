@@ -82,112 +82,174 @@ export default function ScheduleConcert() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <h2 className="text-2xl font-semibold mb-4">
-        Schedule Concert — Send Invites
-      </h2>
-
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-6 rounded-lg shadow space-y-4"
-      >
-        <label className="block">
-          <div className="text-sm text-gray-600">Select concert</div>
-          <select
-            value={selectedConcert}
-            onChange={(e) => setSelectedConcert(e.target.value)}
-            className="mt-1 w-full border rounded px-3 py-2"
-          >
-            <option value="">-- choose concert --</option>
-            {concerts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="grid md:grid-cols-2 gap-3">
-          <label className="block">
-            <div className="text-sm text-gray-600">Date & time (optional)</div>
-            <input
-              type="datetime-local"
-              value={dateTime}
-              onChange={(e) => setDateTime(e.target.value)}
-              className="mt-1 w-full border rounded px-3 py-2"
-            />
-          </label>
-
-          <label className="block">
-            <div className="text-sm text-gray-600">Venue (optional)</div>
-            <input
-              value={venue}
-              onChange={(e) => setVenue(e.target.value)}
-              className="mt-1 w-full border rounded px-3 py-2"
-            />
-          </label>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 py-12">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="mb-8">
+          <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-3">
+            <span className="text-4xl">🎭</span>
+            Schedule Concert
+          </h2>
+          <p className="text-gray-600 ml-14">
+            Send invitations to artists for your upcoming concert
+          </p>
         </div>
 
-        <div>
-          <h4 className="font-medium mb-2">Invite Artists</h4>
-
-          {/* If you have ArtistPicker, it will call onAdd with the artist object */}
-          {/* If you don't have ArtistPicker, you can search artists via getArtists directly */}
-          <ArtistPicker onAdd={addInvite} />
-
-          <div className="mt-3 space-y-2">
-            {invites.map((inv) => (
-              <div
-                key={inv.user_id}
-                className="flex items-center gap-3 p-2 border rounded"
-              >
-                <div className="flex-1">
-                  <div className="font-medium">{inv.name}</div>
-                  <div className="text-xs text-gray-500">{inv.role}</div>
-                </div>
-
-                <input
-                  type="number"
-                  min="1"
-                  value={inv.priority}
-                  onChange={(e) =>
-                    setPriority(inv.user_id, parseInt(e.target.value || "1"))
-                  }
-                  className="w-20 border rounded px-2 py-1"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeInvite(inv.user_id)}
-                  className="text-sm text-red-500"
-                >
-                  Remove
-                </button>
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white p-8 rounded-2xl shadow-xl border border-purple-100 space-y-6"
+        >
+          {/* Concert Selection */}
+          <div>
+            <label className="block">
+              <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <span className="text-lg">🎵</span>
+                Select Concert
               </div>
-            ))}
+              <select
+                value={selectedConcert}
+                onChange={(e) => setSelectedConcert(e.target.value)}
+                className="mt-1 w-full border-2 border-purple-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-white text-gray-800 font-medium hover:border-purple-300"
+              >
+                <option value="">-- Choose a concert --</option>
+                {concerts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-        </div>
 
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-purple-700 text-white px-4 py-2 rounded"
-          >
-            {loading ? "Sending..." : "Send Invites"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setInvites([]);
-              setDateTime("");
-              setVenue("");
-            }}
-            className="px-4 py-2 border rounded"
-          >
-            Reset
-          </button>
-        </div>
-      </form>
+          {/* Date & Venue */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <label className="block">
+              <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <span className="text-lg">📅</span>
+                Date & Time{" "}
+                <span className="text-xs text-gray-500 font-normal">
+                  (optional)
+                </span>
+              </div>
+              <input
+                type="datetime-local"
+                value={dateTime}
+                onChange={(e) => setDateTime(e.target.value)}
+                className="mt-1 w-full border-2 border-purple-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:border-purple-300"
+              />
+            </label>
+
+            <label className="block">
+              <div className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <span className="text-lg">📍</span>
+                Venue{" "}
+                <span className="text-xs text-gray-500 font-normal">
+                  (optional)
+                </span>
+              </div>
+              <input
+                value={venue}
+                onChange={(e) => setVenue(e.target.value)}
+                placeholder="Enter venue location"
+                className="mt-1 w-full border-2 border-purple-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:border-purple-300"
+              />
+            </label>
+          </div>
+
+          {/* Artist Invitation Section */}
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-100">
+            <h4 className="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
+              <span className="text-xl">👥</span>
+              Invite Artists
+            </h4>
+
+            <ArtistPicker onAdd={addInvite} />
+
+            {/* Invited Artists List */}
+            <div className="mt-5 space-y-3">
+              {invites.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 bg-white rounded-xl border-2 border-dashed border-gray-200">
+                  <span className="text-4xl block mb-2">🎤</span>
+                  <p>No artists invited yet. Start adding artists above!</p>
+                </div>
+              ) : (
+                invites.map((inv) => (
+                  <div
+                    key={inv.user_id}
+                    className="flex items-center gap-4 p-4 border-2 border-purple-200 rounded-xl bg-white hover:shadow-md transition-all duration-300 hover:border-purple-300"
+                  >
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
+                      {inv.name.charAt(0).toUpperCase()}
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="font-bold text-gray-800">{inv.name}</div>
+                      <div className="text-sm px-3 py-1 bg-purple-100 text-purple-700 rounded-full inline-block font-medium mt-1">
+                        {inv.role}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-semibold text-gray-600">
+                        Priority:
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={inv.priority}
+                        onChange={(e) =>
+                          setPriority(
+                            inv.user_id,
+                            parseInt(e.target.value || "1")
+                          )
+                        }
+                        className="w-20 border-2 border-purple-200 rounded-lg px-3 py-2 font-semibold text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeInvite(inv.user_id)}
+                      className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all font-semibold text-sm hover:scale-105"
+                    >
+                      ✕ Remove
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-4 pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-6 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="animate-spin">⏳</span> Sending...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  📤 Send Invitations
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInvites([]);
+                setDateTime("");
+                setVenue("");
+              }}
+              className="px-6 py-4 border-2 border-purple-200 text-purple-700 rounded-xl font-bold hover:bg-purple-50 transition-all duration-300 hover:scale-105 hover:border-purple-300"
+            >
+              🔄 Reset
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
