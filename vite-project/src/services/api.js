@@ -39,7 +39,7 @@ export function setCurrentUser(email) {
   currentUserEmail = email;
   save();
 
-  // Dispatch event for components to reload when user changes
+  // Dispatch global event so components (Dashboard, Schedule) reload
   try {
     window.dispatchEvent(
       new CustomEvent("swarsethu:userChanged", { detail: { email } })
@@ -93,6 +93,19 @@ export async function getByRole(role = "") {
       200
     )
   );
+}
+
+// ============================
+// Helper — Fix local timezone ISO string
+// ============================
+function toLocalISOString(dateInput) {
+  const d = new Date(dateInput);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hour = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${min}`;
 }
 
 // ============================
@@ -157,11 +170,12 @@ export async function createSession(payload) {
   }
   concertTitle = concertTitle || payload.concert_id || "Untitled Concert";
 
+  // ✅ FIX: store date_time as local (no UTC shift)
   const session = {
     id: `s_${Date.now()}`,
     concert_id: payload.concert_id,
     concert_title: concertTitle,
-    date_time: payload.date_time,
+    date_time: toLocalISOString(payload.date_time),
     venue: payload.venue,
     invites: payload.invites || [],
     created_by: sender.email,
@@ -169,7 +183,7 @@ export async function createSession(payload) {
   };
   sessions.push(session);
 
-  // Create invitation entries
+  // Create invitations
   payload.invites.forEach((inv) => {
     const artist = registeredArtists.find((a) => a.id === inv.user_id);
     const inviteObj = {
@@ -187,7 +201,8 @@ export async function createSession(payload) {
       created_at: new Date().toISOString(),
       venue: session.venue,
       concert_title: concertTitle,
-      date_time: session.date_time,
+      // ✅ FIX: ensure same local date
+      date_time: toLocalISOString(session.date_time),
       invited_user_name: artist ? artist.name : "Unknown",
     };
     invitations.push(inviteObj);

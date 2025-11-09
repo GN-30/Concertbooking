@@ -127,12 +127,12 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
           Dashboard
         </h2>
 
         {/* Current user info */}
-        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6 bg-white rounded-xl px-5 py-4 shadow-md border border-purple-100">
+        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6 bg-white rounded-xl px-4 sm:px-5 py-4 shadow-md border border-purple-100">
           <div className="text-gray-700 font-medium">
             Logged in as:{" "}
             <span className="font-bold text-purple-600">
@@ -141,12 +141,12 @@ export default function Dashboard() {
             <span className="text-gray-500">({data.currentUser.role})</span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm font-semibold text-gray-700">View:</label>
             <select
               value={filterMode}
               onChange={(e) => setFilterMode(e.target.value)}
-              className="border-2 border-purple-200 rounded-lg px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:border-purple-300"
+              className="border-2 border-purple-200 rounded-lg px-3 sm:px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:border-purple-300 w-full sm:w-auto"
             >
               <option value="me">My Calendar</option>
               <option value="all">All Artists</option>
@@ -160,10 +160,10 @@ export default function Dashboard() {
         </div>
 
         {/* Calendar Section */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="md:col-span-2 bg-white rounded-2xl shadow-xl p-6 border border-purple-100">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="font-bold text-2xl text-gray-800">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="md:col-span-2 bg-white rounded-2xl shadow-xl p-4 sm:p-6 border border-purple-100">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-3">
+              <h3 className="font-bold text-lg sm:text-xl md:text-2xl text-gray-800">
                 {viewDate.toLocaleString(undefined, {
                   month: "long",
                   year: "numeric",
@@ -212,13 +212,13 @@ export default function Dashboard() {
             </div>
 
             {/* Weekdays */}
-            <div className="grid grid-cols-7 text-center text-sm font-bold text-gray-600 border-b-2 border-purple-100 pb-3 mb-3">
+            <div className="grid grid-cols-7 text-center text-xs sm:text-sm font-bold text-gray-600 border-b-2 border-purple-100 pb-3 mb-3">
               {DAY_NAMES.map((d) => (
                 <div key={d}>{d}</div>
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {[...Array(totalCells)].map((_, i) => {
                 const dayNum = i - firstDay + 1;
                 const date = new Date(
@@ -234,7 +234,7 @@ export default function Dashboard() {
                 return (
                   <div
                     key={i}
-                    className={`min-h-[90px] border-2 rounded-xl p-2 flex flex-col justify-between transition-all ${
+                    className={`min-h-[70px] sm:min-h-[90px] border-2 rounded-xl p-1 sm:p-2 flex flex-col justify-between transition-all ${
                       inMonth
                         ? isToday
                           ? "bg-gradient-to-br from-purple-100 to-pink-100 border-purple-400 shadow-md"
@@ -268,11 +268,11 @@ export default function Dashboard() {
           </div>
 
           {/* Events for selected date */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 border border-purple-100">
-            <h4 className="font-bold text-xl mb-4 text-gray-800">
+          <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 border border-purple-100">
+            <h4 className="font-bold text-lg sm:text-xl mb-4 text-gray-800">
               Events on {new Date(selectedDate).toLocaleDateString()}
             </h4>
-            <div className="space-y-3 max-h-[500px] overflow-auto">
+            <div className="space-y-3 max-h-[400px] sm:max-h-[500px] overflow-auto">
               {eventsForDate(selectedDate).length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-8 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-dashed border-purple-200">
                   No events scheduled
@@ -309,10 +309,10 @@ export default function Dashboard() {
         </div>
 
         {/* Invitations */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Received */}
-          <section className="bg-white rounded-2xl shadow-xl p-6 border border-purple-100">
-            <h3 className="font-bold text-2xl mb-4 text-gray-800">
+          <section className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 border border-purple-100">
+            <h3 className="font-bold text-xl sm:text-2xl mb-4 text-gray-800">
               Received Invitations
             </h3>
             <div className="space-y-3">
@@ -354,16 +354,16 @@ export default function Dashboard() {
                     </span>
                   </div>
                   {inv.status === "pending" && (
-                    <div className="flex gap-3 mt-3">
+                    <div className="flex flex-col sm:flex-row gap-3 mt-3">
                       <button
                         onClick={() => handleResponse(inv.id, "accepted")}
-                        className="px-5 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition-all hover:shadow-lg hover:scale-105"
+                        className="px-5 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition-all hover:shadow-lg hover:scale-105 w-full sm:w-auto"
                       >
                         Accept
                       </button>
                       <button
                         onClick={() => handleResponse(inv.id, "rejected")}
-                        className="px-5 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-semibold hover:from-red-600 hover:to-red-700 transition-all hover:shadow-lg hover:scale-105"
+                        className="px-5 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-semibold hover:from-red-600 hover:to-red-700 transition-all hover:shadow-lg hover:scale-105 w-full sm:w-auto"
                       >
                         Decline
                       </button>
@@ -375,8 +375,8 @@ export default function Dashboard() {
           </section>
 
           {/* Sent */}
-          <section className="bg-white rounded-2xl shadow-xl p-6 border border-purple-100">
-            <h3 className="font-bold text-2xl mb-4 text-gray-800">
+          <section className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 border border-purple-100">
+            <h3 className="font-bold text-xl sm:text-2xl mb-4 text-gray-800">
               Sent Invitations
             </h3>
             <div className="space-y-3">

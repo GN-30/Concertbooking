@@ -1,29 +1,16 @@
 // src/components/Header.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { getAllArtists, getCurrentUser, setCurrentUser } from "../services/api";
 
 export default function Header() {
   const location = useLocation();
-  const [artists, setArtists] = useState([]);
-  const [current, setCurrent] = useState(getCurrentUser()?.email || "");
   const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    getAllArtists().then(setArtists);
-  }, []);
-
-  function handleSwitch(e) {
-    const email = e.target.value;
-    setCurrent(email);
-    setCurrentUser(email);
-  }
 
   return (
     <header className="bg-gradient-to-r from-purple-50 via-white to-pink-50 border-b border-purple-100 shadow-md sticky top-0 z-50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo and Title */}
+          {/* Logo */}
           <Link
             to="/"
             className="flex items-center font-bold text-xl transition-colors"
@@ -41,19 +28,6 @@ export default function Header() {
             <NavItem to="/schedule" label="Schedule" location={location} />
             <NavItem to="/artists" label="Artists" location={location} />
             <NavItem to="/register" label="Register" location={location} />
-
-            {/* User Switcher */}
-            <select
-              value={current}
-              onChange={handleSwitch}
-              className="ml-4 border-2 border-purple-200 rounded-lg px-4 py-2 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all hover:border-purple-300 shadow-sm"
-            >
-              {artists.map((a) => (
-                <option key={a.id} value={a.email}>
-                  {a.name} ({a.role})
-                </option>
-              ))}
-            </select>
           </nav>
 
           {/* Mobile Menu Button */}
@@ -122,27 +96,6 @@ export default function Header() {
               location={location}
               setMenuOpen={setMenuOpen}
             />
-
-            {/* Divider & User Switcher */}
-            <div className="border-t border-purple-100 pt-3">
-              <label className="block text-xs font-semibold text-gray-600 mb-2">
-                Switch Artist
-              </label>
-              <select
-                value={current}
-                onChange={(e) => {
-                  handleSwitch(e);
-                  setMenuOpen(false);
-                }}
-                className="w-full border-2 border-purple-200 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent hover:border-purple-300 transition-all"
-              >
-                {artists.map((a) => (
-                  <option key={a.id} value={a.email}>
-                    {a.name} ({a.role})
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
       )}
@@ -150,7 +103,6 @@ export default function Header() {
   );
 }
 
-/* Desktop Nav Link */
 function NavItem({ to, label, location }) {
   const active = location.pathname === to;
   return (
@@ -167,7 +119,6 @@ function NavItem({ to, label, location }) {
   );
 }
 
-/* Mobile Nav Link */
 function MobileLink({ to, label, location, setMenuOpen }) {
   const active = location.pathname === to;
   return (
