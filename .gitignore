@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+vite-project/node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+backend/.env
+vite-project/.env
+
+# Build outputs
+vite-project/dist/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
