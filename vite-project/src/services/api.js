@@ -17,15 +17,24 @@ const USE_SUPABASE =
   import.meta.env.VITE_SUPABASE_URL !== "https://placeholder.supabase.co";
 
 // ============================
-// Local Database (in localStorage — used as fallback)
-// ============================
-let registeredArtists =
-  JSON.parse(localStorage.getItem("artists")) ||
-  [
-    { id: "a1", name: "S. Kumar", email: "kumar@mail.com", role: "vocal", username: "skumar" },
-    { id: "a2", name: "T. Ramesh", email: "ramesh@mail.com", role: "mrudangist", username: "tramesh" },
-    { id: "a3", name: "L. Priya", email: "priya@mail.com", role: "harmonist", username: "lpriya" },
-  ];
+const DEFAULT_ARTISTS = [
+  { id: "a1", name: "S. Kumar", email: "kumar@mail.com", role: "vocal", username: "skumar", bio: "Senior Carnatic vocalist renowned for soulful Bhava and intricate ragas.", calendar_visibility: "public", calendar_allowed_users: [], calendar_hidden_users: [] },
+  { id: "a2", name: "T. Ramesh", email: "ramesh@mail.com", role: "mrudangist", username: "tramesh", bio: "Veteran Mridangam maestro with 25+ years accompanying stalwarts.", calendar_visibility: "public", calendar_allowed_users: [], calendar_hidden_users: [] },
+  { id: "a3", name: "L. Priya", email: "priya@mail.com", role: "harmonist", username: "lpriya", bio: "Versatile Harmonium soloist & accompanist specializing in Bhajans & Katcheri.", calendar_visibility: "public", calendar_allowed_users: [], calendar_hidden_users: [] },
+  { id: "a4", name: "Ustad Zakir Ahmed", email: "zakir@mail.com", role: "tabla", username: "zakir", bio: "Hindustani Tabla virtuoso celebrated for lightning-fast tihais and crisp bols.", calendar_visibility: "public", calendar_allowed_users: [], calendar_hidden_users: [] },
+  { id: "a5", name: "Vidushi Gayatri V.", email: "gayatri@mail.com", role: "veena", username: "gayatri", bio: "Saraswati Veena maestro evoking pure classical divinity and microtonal shrutis.", calendar_visibility: "public", calendar_allowed_users: [], calendar_hidden_users: [] },
+  { id: "a6", name: "Pandit Rakesh Venu", email: "rakesh@mail.com", role: "flutist", username: "rakesh", bio: "Master of the bamboo flute crafting spiritual alapanas and resonant gamakas.", calendar_visibility: "public", calendar_allowed_users: [], calendar_hidden_users: [] },
+];
+
+let rawStoredArtists = JSON.parse(localStorage.getItem("artists") || "null");
+let registeredArtists = rawStoredArtists && rawStoredArtists.length > 0
+  ? rawStoredArtists.map((a) => ({
+      ...a,
+      calendar_visibility: a.calendar_visibility || "public",
+      calendar_allowed_users: Array.isArray(a.calendar_allowed_users) ? a.calendar_allowed_users : [],
+      calendar_hidden_users: Array.isArray(a.calendar_hidden_users) ? a.calendar_hidden_users : [],
+    }))
+  : DEFAULT_ARTISTS;
 
 let invitations = JSON.parse(localStorage.getItem("invitations")) || [];
 let sessions = JSON.parse(localStorage.getItem("sessions")) || [];
@@ -37,6 +46,110 @@ function save() {
   localStorage.setItem("invitations", JSON.stringify(invitations));
   localStorage.setItem("sessions", JSON.stringify(sessions));
   localStorage.setItem("currentUserEmail", currentUserEmail);
+}
+
+// ============================
+// Persistent Calendar Privacy Map
+// ============================
+export function getPrivacyMap() {
+  try {
+    return JSON.parse(localStorage.getItem("calendar_privacy_map") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function savePrivacyForArtist(artistKey, settings = {}) {
+  if (!artistKey) return;
+  const map = getPrivacyMap();
+
+  const visibility =
+    settings.visibility ||
+    settings.calendar_visibility ||
+    "public";
+
+  const allowedUsers = Array.isArray(settings.allowedUsers)
+    ? settings.allowedUsers
+    : Array.isArray(settings.calendar_allowed_users)
+    ? settings.calendar_allowed_users
+    : [];
+
+  const hiddenUsers = Array.isArray(settings.hiddenUsers)
+    ? settings.hiddenUsers
+    : Array.isArray(settings.calendar_hidden_users)
+    ? settings.calendar_hidden_users
+    : [];
+
+  const entry = {
+    visibility,
+    calendar_visibility: visibility,
+    allowedUsers,
+    calendar_allowed_users: allowedUsers,
+    hiddenUsers,
+    calendar_hidden_users: hiddenUsers,
+  };
+
+  const strKey = String(artistKey).trim();
+  if (strKey) {
+    map[strKey] = entry;
+    map[strKey.toLowerCase()] = entry;
+  }
+  localStorage.setItem("calendar_privacy_map", JSON.stringify(map));
+
+  // Sync directly into localStorage "artists" array so any local lookup gets the updated privacy
+  try {
+    const raw = JSON.parse(localStorage.getItem("artists") || "null");
+    if (Array.isArray(raw)) {
+      const k = strKey.toLowerCase();
+      const updated = raw.map((a) => {
+        if (
+          String(a.id || "").toLowerCase() === k ||
+          String(a.email || "").toLowerCase() === k ||
+          String(a.username || "").toLowerCase() === k ||
+          String(a.name || "").toLowerCase() === k
+        ) {
+          return {
+            ...a,
+            visibility: entry.visibility,
+            calendar_visibility: entry.visibility,
+            allowedUsers: entry.allowedUsers,
+            calendar_allowed_users: entry.allowedUsers,
+            hiddenUsers: entry.hiddenUsers,
+            calendar_hidden_users: entry.hiddenUsers,
+          };
+        }
+        return a;
+      });
+      localStorage.setItem("artists", JSON.stringify(updated));
+      registeredArtists = updated;
+    }
+  } catch (e) {}
+
+  return entry;
+}
+
+export function applyPrivacyToArtist(artist) {
+  if (!artist) return artist;
+  const map = getPrivacyMap();
+  const idKey = artist.id ? map[String(artist.id)] || map[String(artist.id).toLowerCase()] : null;
+  const emailKey = artist.email ? map[String(artist.email)] || map[String(artist.email).toLowerCase()] : null;
+  const usernameKey = artist.username ? map[String(artist.username)] || map[String(artist.username).toLowerCase()] : null;
+  const nameKey = artist.name ? map[String(artist.name)] || map[String(artist.name).toLowerCase()] : null;
+  const p = idKey || emailKey || usernameKey || nameKey;
+
+  const mode = p?.visibility || p?.calendar_visibility || artist.calendar_visibility || artist.visibility || "public";
+  const allowed = p?.allowedUsers || p?.calendar_allowed_users || artist.calendar_allowed_users || artist.allowedUsers || [];
+  const hidden = p?.hiddenUsers || p?.calendar_hidden_users || artist.calendar_hidden_users || artist.hiddenUsers || [];
+
+  return {
+    ...artist,
+    visibility: mode,
+    calendar_visibility: mode,
+    allowedUsers: allowed,
+    calendar_allowed_users: allowed,
+    hiddenUsers: hidden,
+    calendar_hidden_users: hidden,
+  };
 }
 
 // ============================
@@ -56,21 +169,88 @@ function toLocalISOString(dateInput) {
 // Current User
 // ============================
 export function getCurrentUser() {
-  if (USE_SUPABASE) {
-    const u = JSON.parse(localStorage.getItem("currentUserSupabase") || "null");
-    if (u) return u;
+  const activeEmailOrId = (localStorage.getItem("currentUserEmail") || currentUserEmail || "").trim().toLowerCase();
+  if (!activeEmailOrId) return null;
+
+  // 1. Check if currentUserSupabase matches the active logged-in email or ID or username or name
+  const u = JSON.parse(localStorage.getItem("currentUserSupabase") || "null");
+  if (
+    u &&
+    (String(u.email || "").toLowerCase() === activeEmailOrId ||
+      String(u.id || "").toLowerCase() === activeEmailOrId ||
+      String(u.username || "").toLowerCase() === activeEmailOrId ||
+      String(u.name || "").toLowerCase() === activeEmailOrId)
+  ) {
+    return applyPrivacyToArtist(u);
   }
-  const email = localStorage.getItem("currentUserEmail") || currentUserEmail;
-  const localU = registeredArtists.find((a) => a.email === email || a.id === email);
-  if (localU) return localU;
-  return registeredArtists[0] || { id: "a1", name: "S. Kumar", email: "kumar@mail.com", role: "Vocalist" };
+
+  // 2. Freshly look up in registered artists
+  const raw = JSON.parse(localStorage.getItem("artists") || "null");
+  const list = raw && raw.length > 0 ? raw : registeredArtists;
+  const found = list.find(
+    (a) =>
+      String(a.email || "").toLowerCase() === activeEmailOrId ||
+      String(a.id || "").toLowerCase() === activeEmailOrId ||
+      String(a.username || "").toLowerCase() === activeEmailOrId ||
+      String(a.name || "").toLowerCase() === activeEmailOrId
+  );
+  if (found) {
+    return applyPrivacyToArtist(found);
+  }
+
+  // 3. If u is present at all, return it decorated
+  if (u) {
+    return applyPrivacyToArtist(u);
+  }
+
+  // 4. Fallback
+  return applyPrivacyToArtist(list[0] || DEFAULT_ARTISTS[0]);
 }
 
-export function setCurrentUser(email) {
-  currentUserEmail = email;
+export function setCurrentUser(emailOrId) {
+  const val = (emailOrId || "").trim();
+  currentUserEmail = val;
+  localStorage.setItem("currentUserEmail", val);
+
+  if (!val) {
+    localStorage.removeItem("currentUserSupabase");
+    save();
+    return;
+  }
+
+  const raw = JSON.parse(localStorage.getItem("artists") || "null");
+  const list = raw && raw.length > 0 ? raw : registeredArtists;
+  const found = list.find(
+    (a) =>
+      String(a.email || "").toLowerCase() === val.toLowerCase() ||
+      String(a.id || "").toLowerCase() === val.toLowerCase() ||
+      String(a.username || "").toLowerCase() === val.toLowerCase() ||
+      String(a.name || "").toLowerCase() === val.toLowerCase()
+  );
+
+  if (found) {
+    localStorage.setItem("currentUserSupabase", JSON.stringify(applyPrivacyToArtist(found)));
+  } else {
+    // Check if existing currentUserSupabase matches this identifier; if so, keep it!
+    const existing = JSON.parse(localStorage.getItem("currentUserSupabase") || "null");
+    if (
+      existing &&
+      (String(existing.email || "").toLowerCase() === val.toLowerCase() ||
+        String(existing.id || "").toLowerCase() === val.toLowerCase() ||
+        String(existing.username || "").toLowerCase() === val.toLowerCase() ||
+        String(existing.name || "").toLowerCase() === val.toLowerCase())
+    ) {
+      localStorage.setItem("currentUserSupabase", JSON.stringify(applyPrivacyToArtist(existing)));
+    } else {
+      // Do not wipe out; preserve user with updated ID/email
+      const partialUser = { id: val, email: val, name: val, role: "Classical Artist" };
+      localStorage.setItem("currentUserSupabase", JSON.stringify(applyPrivacyToArtist(partialUser)));
+    }
+  }
+
   save();
   try {
-    window.dispatchEvent(new CustomEvent("swarsethu:userChanged", { detail: { email } }));
+    window.dispatchEvent(new CustomEvent("swarsethu:userChanged", { detail: { email: val } }));
   } catch (e) {
     const ev = document.createEvent("Event");
     ev.initEvent("swarsethu:userChanged", true, true);
@@ -79,11 +259,38 @@ export function setCurrentUser(email) {
 }
 
 export function setCurrentUserObj(userObj) {
-  localStorage.setItem("currentUserSupabase", JSON.stringify(userObj));
-  currentUserEmail = userObj.email;
-  localStorage.setItem("currentUserEmail", userObj.email);
+  if (!userObj) {
+    setCurrentUser("");
+    return;
+  }
+  const decorated = applyPrivacyToArtist(userObj);
+  localStorage.setItem("currentUserSupabase", JSON.stringify(decorated));
+  currentUserEmail = decorated.email || decorated.id || decorated.username || decorated.name || "";
+  localStorage.setItem("currentUserEmail", currentUserEmail);
+
+  // Sync to local artists list
   try {
-    window.dispatchEvent(new CustomEvent("swarsethu:userChanged", { detail: { email: userObj.email } }));
+    const raw = JSON.parse(localStorage.getItem("artists") || "null");
+    const list = Array.isArray(raw) && raw.length > 0 ? raw : registeredArtists;
+    const idx = list.findIndex(
+      (a) =>
+        (decorated.id && String(a.id || "").toLowerCase() === String(decorated.id).toLowerCase()) ||
+        (decorated.email && String(a.email || "").toLowerCase() === String(decorated.email).toLowerCase()) ||
+        (decorated.username && String(a.username || "").toLowerCase() === String(decorated.username).toLowerCase()) ||
+        (decorated.name && String(a.name || "").toLowerCase() === String(decorated.name).toLowerCase())
+    );
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...decorated };
+    } else {
+      list.push(decorated);
+    }
+    localStorage.setItem("artists", JSON.stringify(list));
+    registeredArtists = list;
+  } catch (e) {}
+
+  save();
+  try {
+    window.dispatchEvent(new CustomEvent("swarsethu:userChanged", { detail: { email: currentUserEmail, user: decorated } }));
   } catch (e) {}
 }
 
@@ -152,32 +359,297 @@ export async function registerArtist({ name, email, role, username, password }) 
 }
 
 export async function getAllArtists() {
+  let list = [];
   if (USE_BACKEND) {
     try {
       const res = await fetch(`${BACKEND_URL}/api/artists`);
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json) && json.length > 0) {
+          list = json;
+        }
+      }
     } catch (e) {
-      console.warn("Backend unavailable, falling back:", e);
+      console.warn("Backend unavailable, falling back:", e.message);
     }
   }
-  if (USE_SUPABASE) {
-    const { data, error } = await supabase.from("artists").select("*").order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
-    return data || [];
+
+  if (list.length === 0 && USE_SUPABASE) {
+    try {
+      const { data, error } = await supabase
+        .from("artists")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (!error && Array.isArray(data) && data.length > 0) {
+        list = data;
+      }
+    } catch (e) {
+      console.warn("Supabase getAllArtists failed, falling back to local:", e.message);
+    }
   }
-  return new Promise((resolve) => setTimeout(() => resolve([...registeredArtists]), 150));
+
+  if (list.length === 0) {
+    const rawStored = JSON.parse(localStorage.getItem("artists") || "null");
+    list = rawStored && rawStored.length > 0 ? rawStored : registeredArtists;
+  }
+
+  // Always keep localStorage "artists" cache refreshed so local queries have full data
+  if (Array.isArray(list) && list.length > 0) {
+    try {
+      localStorage.setItem("artists", JSON.stringify(list));
+      registeredArtists = list;
+    } catch (e) {}
+  }
+
+  return list.map(applyPrivacyToArtist);
 }
 
-export function updateArtistById(id, updates = {}) {
-  if (USE_SUPABASE) {
-    return supabase.from("artists").update(updates).eq("id", id).select().single()
-      .then(({ data, error }) => { if (error) throw error; return data; });
+// ============================
+// Calendar Privacy & Visibility
+// ============================
+
+/**
+ * Checks whether the viewer is permitted to see the target artist's calendar.
+ * Returns { allowed: boolean, mode: string, reason?: string, isSelf?: boolean }
+ */
+export function checkCalendarAccess(targetArtistInput, viewerInput) {
+  if (!targetArtistInput) return { allowed: true, mode: "public" };
+
+  const targetArtist = applyPrivacyToArtist(targetArtistInput);
+  const viewer = viewerInput ? applyPrivacyToArtist(viewerInput) : null;
+
+  const viewerId = viewer?.id ? String(viewer.id).toLowerCase().trim() : "";
+  const viewerEmail = viewer?.email ? viewer.email.toLowerCase().trim() : "";
+  const viewerUsername = viewer?.username ? viewer.username.toLowerCase().trim() : "";
+  const viewerName = viewer?.name ? viewer.name.toLowerCase().trim() : "";
+
+  const targetId = targetArtist?.id ? String(targetArtist.id).toLowerCase().trim() : "";
+  const targetEmail = targetArtist?.email ? targetArtist.email.toLowerCase().trim() : "";
+  const targetUsername = targetArtist?.username ? targetArtist.username.toLowerCase().trim() : "";
+  const targetName = targetArtist?.name ? targetArtist.name.toLowerCase().trim() : "";
+
+  // Viewing own calendar (or special self identifier "me")
+  const isSelf = Boolean(
+    targetId === "me" ||
+      (viewer &&
+        ((viewerId && targetId && viewerId === targetId) ||
+          (viewerEmail && targetEmail && viewerEmail === targetEmail) ||
+          (viewerUsername && targetUsername && viewerUsername === targetUsername) ||
+          (viewerName && targetName && viewerName === targetName)))
+  );
+
+  if (isSelf) {
+    return {
+      allowed: true,
+      mode: targetArtist.calendar_visibility || "public",
+      isSelf: true,
+    };
   }
-  const idx = registeredArtists.findIndex((a) => a.id === id);
-  if (idx === -1) return null;
-  registeredArtists[idx] = { ...registeredArtists[idx], ...updates };
+
+  const mode = targetArtist.calendar_visibility || "public";
+  const allowed = Array.isArray(targetArtist.calendar_allowed_users)
+    ? targetArtist.calendar_allowed_users.map((u) => String(u).toLowerCase().trim())
+    : [];
+  const hidden = Array.isArray(targetArtist.calendar_hidden_users)
+    ? targetArtist.calendar_hidden_users.map((u) => String(u).toLowerCase().trim())
+    : [];
+
+  if (mode === "private") {
+    return {
+      allowed: false,
+      mode: "private",
+      reason: `${targetArtist.name || "This artist"} has set their concert schedule to private mode (Only Me). Detailed bookings and availability are hidden.`,
+    };
+  }
+
+  if (mode === "whitelist") {
+    const isAllowed = allowed.some(
+      (u) =>
+        (viewerId && u === viewerId) ||
+        (viewerEmail && u === viewerEmail) ||
+        (viewerUsername && u === viewerUsername) ||
+        (viewerName && u === viewerName)
+    );
+    if (!isAllowed) {
+      return {
+        allowed: false,
+        mode: "whitelist",
+        reason: `${targetArtist.name || "This artist"} has restricted their calendar to selected collaborators only.`,
+      };
+    }
+    return { allowed: true, mode: "whitelist" };
+  }
+
+  if (mode === "blacklist") {
+    const isBlocked = hidden.some(
+      (u) =>
+        (viewerId && u === viewerId) ||
+        (viewerEmail && u === viewerEmail) ||
+        (viewerUsername && u === viewerUsername) ||
+        (viewerName && u === viewerName)
+    );
+    if (isBlocked) {
+      return {
+        allowed: false,
+        mode: "blacklist",
+        reason: `${targetArtist.name || "This artist"} has restricted your account from viewing their calendar.`,
+      };
+    }
+    return { allowed: true, mode: "blacklist" };
+  }
+
+  return { allowed: true, mode: "public" };
+}
+
+export async function updateArtistById(id, updates = {}) {
+  // Always update registeredArtists locally
+  const rawStored = JSON.parse(localStorage.getItem("artists") || "null");
+  const list = rawStored && rawStored.length > 0 ? rawStored : registeredArtists;
+  const strId = String(id || "").toLowerCase().trim();
+  const idx = list.findIndex(
+    (a) =>
+      String(a.id || "").toLowerCase().trim() === strId ||
+      String(a.email || "").toLowerCase().trim() === strId ||
+      String(a.username || "").toLowerCase().trim() === strId ||
+      String(a.name || "").toLowerCase().trim() === strId
+  );
+  if (idx !== -1) {
+    list[idx] = { ...list[idx], ...updates };
+    registeredArtists = list;
+    save();
+  }
+
+  if (USE_BACKEND) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/artists/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json;
+      }
+    } catch (e) {
+      console.warn("Backend updateArtistById failed, using local/supabase fallback:", e.message);
+    }
+  }
+
+  if (USE_SUPABASE) {
+    try {
+      const { data, error } = await supabase
+        .from("artists")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (!error && data) {
+        return data;
+      }
+    } catch (e) {
+      console.warn("Supabase updateArtistById fallback:", e.message);
+    }
+  }
+
+  if (idx !== -1) {
+    return list[idx];
+  }
+
+  const current = getCurrentUser();
+  if (current && (current.id === id || current.email === id || current.name === id)) {
+    const updated = { ...current, ...updates };
+    registeredArtists.push(updated);
+    save();
+    return updated;
+  }
+  return null;
+}
+
+export async function updateCalendarPrivacy(userOrId, settings = {}) {
+  const visibility =
+    settings.visibility ||
+    settings.calendar_visibility ||
+    "public";
+
+  const allowedUsers = Array.isArray(settings.allowedUsers)
+    ? settings.allowedUsers
+    : Array.isArray(settings.calendar_allowed_users)
+    ? settings.calendar_allowed_users
+    : [];
+
+  const hiddenUsers = Array.isArray(settings.hiddenUsers)
+    ? settings.hiddenUsers
+    : Array.isArray(settings.calendar_hidden_users)
+    ? settings.calendar_hidden_users
+    : [];
+
+  const updates = {
+    visibility,
+    calendar_visibility: visibility,
+    allowedUsers,
+    calendar_allowed_users: allowedUsers,
+    hiddenUsers,
+    calendar_hidden_users: hiddenUsers,
+  };
+
+  const current = getCurrentUser();
+  const targetObj = typeof userOrId === "object" && userOrId !== null ? userOrId : current;
+  const targetId = typeof userOrId === "string" ? userOrId : (targetObj?.id || targetObj?.email || targetObj?.name);
+
+  // 1. Immediately persist under all key combinations in privacy map
+  const keysToSave = new Set();
+  if (targetId) keysToSave.add(String(targetId));
+  if (targetObj) {
+    if (targetObj.id) keysToSave.add(String(targetObj.id));
+    if (targetObj.email) keysToSave.add(String(targetObj.email));
+    if (targetObj.username) keysToSave.add(String(targetObj.username));
+    if (targetObj.name) keysToSave.add(String(targetObj.name));
+  }
+  if (current) {
+    if (current.id) keysToSave.add(String(current.id));
+    if (current.email) keysToSave.add(String(current.email));
+    if (current.username) keysToSave.add(String(current.username));
+    if (current.name) keysToSave.add(String(current.name));
+  }
+
+  keysToSave.forEach((k) => {
+    savePrivacyForArtist(k, updates);
+  });
+
+  // 2. Update local cached list
+  try {
+    const rawStored = JSON.parse(localStorage.getItem("artists") || "null");
+    const list = rawStored && rawStored.length > 0 ? rawStored : registeredArtists;
+    const updatedList = list.map((a) => {
+      const match =
+        keysToSave.has(String(a.id || "")) ||
+        keysToSave.has(String(a.email || "")) ||
+        keysToSave.has(String(a.username || "")) ||
+        keysToSave.has(String(a.name || ""));
+      return match ? { ...a, ...updates } : a;
+    });
+    registeredArtists = updatedList;
+    localStorage.setItem("artists", JSON.stringify(updatedList));
+  } catch (e) {}
+
+  // 3. Update artist in storage / backend
+  const updated = targetId ? await updateArtistById(targetId, updates) : null;
+
+  // 4. Sync current user if updating self
+  if (current) {
+    const isSelfMatch =
+      keysToSave.has(String(current.id || "")) ||
+      keysToSave.has(String(current.email || "")) ||
+      keysToSave.has(String(current.username || "")) ||
+      keysToSave.has(String(current.name || ""));
+    if (isSelfMatch) {
+      const newObj = { ...current, ...updates };
+      setCurrentUserObj(newObj);
+    }
+  }
+
   save();
-  return registeredArtists[idx];
+  return { ...targetObj, ...updates, ...updated };
 }
 
 export async function getArtists(role = "", q = "") {
@@ -251,32 +723,38 @@ export async function loginArtist({ email, identifier, password }) {
 
   // 2. Try Direct Supabase Connection (Supports both email & username)
   if (USE_SUPABASE) {
-    const { data, error } = await supabase
-      .from("artists")
-      .select("*")
-      .or(`email.eq.${loginId},username.eq.${loginId}`)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from("artists")
+        .select("*")
+        .or(`email.eq.${loginId},username.eq.${loginId}`)
+        .maybeSingle();
 
-    if (error) throw new Error(error.message);
-    if (!data) throw new Error("No artist account found with this email or username.");
-
-    if (password && data.password && data.password !== password) {
-      throw new Error("Incorrect password. Please try again.");
+      if (!error && data) {
+        if (password && data.password && data.password !== password) {
+          throw new Error("Incorrect password. Please try again.");
+        }
+        setCurrentUserObj(data);
+        return data;
+      }
+    } catch (e) {
+      if (e.message && e.message.includes("Incorrect password")) throw e;
+      console.warn("Supabase login direct failed, trying local fallback:", e.message);
     }
-
-    setCurrentUserObj(data);
-    return data;
   }
 
   // 3. LocalStorage fallback
-  const artist = registeredArtists.find(
+  const raw = JSON.parse(localStorage.getItem("artists") || "null");
+  const list = raw && raw.length > 0 ? raw : registeredArtists;
+  const artist = list.find(
     (a) =>
       (a.email?.toLowerCase() === loginId.toLowerCase() ||
-        a.username?.toLowerCase() === loginId.toLowerCase()) &&
+        a.username?.toLowerCase() === loginId.toLowerCase() ||
+        String(a.id).toLowerCase() === loginId.toLowerCase()) &&
       (!a.password || !password || a.password === password)
   );
   if (!artist) throw new Error("No artist account found with these credentials.");
-  setCurrentUser(artist.email);
+  setCurrentUserObj(artist);
   return artist;
 }
 
@@ -422,12 +900,18 @@ export async function createSession(payload) {
 // ============================
 // Dashboard Data (Supports viewing any artist's dashboard or all ensemble)
 // ============================
-export async function getDashboard(targetArtistOrId = null) {
+export async function getDashboard(targetArtistOrId = null, viewer = null) {
+  const activeViewer = viewer || getCurrentUser();
+
   // 1. Check if viewing all ensemble overview
   if (targetArtistOrId === "all") {
+    const viewerParam = activeViewer
+      ? `&viewer_id=${encodeURIComponent(activeViewer.id || "")}&viewer_email=${encodeURIComponent(activeViewer.email || "")}&viewer_username=${encodeURIComponent(activeViewer.username || "")}&viewer_name=${encodeURIComponent(activeViewer.name || "")}`
+      : "";
+
     if (USE_BACKEND) {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/dashboard?all=true`);
+        const res = await fetch(`${BACKEND_URL}/api/dashboard?all=true${viewerParam}`);
         if (res.ok) return await res.json();
       } catch (e) {
         console.warn("Backend dashboard fetch failed:", e.message);
@@ -461,17 +945,26 @@ export async function getDashboard(targetArtistOrId = null) {
   // 2. Resolve target artist
   let user = null;
   if (targetArtistOrId && typeof targetArtistOrId === "object" && (targetArtistOrId.id || targetArtistOrId.email)) {
-    user = targetArtistOrId;
+    user = applyPrivacyToArtist(targetArtistOrId);
   } else if (typeof targetArtistOrId === "string" && targetArtistOrId && targetArtistOrId !== "me") {
     const all = await getAllArtists();
-    user = all.find((a) => a.id === targetArtistOrId || a.email === targetArtistOrId || a.username === targetArtistOrId);
-    if (!user && USE_SUPABASE) {
-      const { data } = await supabase
-        .from("artists")
-        .select("*")
-        .or(`id.eq.${targetArtistOrId},email.eq.${targetArtistOrId},username.eq.${targetArtistOrId}`)
-        .maybeSingle();
-      if (data) user = data;
+    const found = all.find(
+      (a) =>
+        String(a.id).toLowerCase() === String(targetArtistOrId).toLowerCase() ||
+        a.email?.toLowerCase() === String(targetArtistOrId).toLowerCase() ||
+        a.username?.toLowerCase() === String(targetArtistOrId).toLowerCase()
+    );
+    if (found) {
+      user = applyPrivacyToArtist(found);
+    } else if (USE_SUPABASE) {
+      try {
+        const { data } = await supabase
+          .from("artists")
+          .select("*")
+          .or(`id.eq.${targetArtistOrId},email.eq.${targetArtistOrId},username.eq.${targetArtistOrId}`)
+          .maybeSingle();
+        if (data) user = applyPrivacyToArtist(data);
+      } catch (e) {}
     }
   }
 
@@ -479,14 +972,32 @@ export async function getDashboard(targetArtistOrId = null) {
     user = getCurrentUser();
   }
   if (!user) {
-    user = { id: "a1", name: "S. Kumar", email: "kumar@mail.com", role: "Vocalist" };
+    user = applyPrivacyToArtist({ id: "a1", name: "S. Kumar", email: "kumar@mail.com", role: "Vocalist" });
+  } else {
+    user = applyPrivacyToArtist(user);
+  }
+
+  // Check Calendar Privacy for this viewer
+  const access = checkCalendarAccess(user, activeViewer);
+  if (!access.allowed) {
+    return {
+      currentUser: user,
+      isCalendarHidden: true,
+      visibilityNotice: access.reason || `${user.name || "This artist"} has restricted their calendar visibility.`,
+      myConcerts: [],
+      sentInvitations: [],
+      invitations: [],
+    };
   }
 
   // 3. Try Backend API
   if (USE_BACKEND) {
     try {
       const queryParam = user.id ? `id=${encodeURIComponent(user.id)}&email=${encodeURIComponent(user.email || "")}` : `email=${encodeURIComponent(user.email || "")}`;
-      const res = await fetch(`${BACKEND_URL}/api/dashboard?${queryParam}`);
+      const viewerParam = activeViewer
+        ? `&viewer_id=${encodeURIComponent(activeViewer.id || "")}&viewer_email=${encodeURIComponent(activeViewer.email || "")}&viewer_username=${encodeURIComponent(activeViewer.username || "")}&viewer_name=${encodeURIComponent(activeViewer.name || "")}`
+        : "";
+      const res = await fetch(`${BACKEND_URL}/api/dashboard?${queryParam}${viewerParam}`);
       if (res.ok) {
         const json = await res.json();
         return {

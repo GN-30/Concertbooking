@@ -15,9 +15,13 @@ import {
   getNotifications,
   getAllArtists,
   getCurrentUser,
+  checkCalendarAccess,
+  setCurrentUser,
+  setCurrentUserObj,
 } from "../services/api";
 import MusicVisualizer3D from "../components/MusicVisualizer3D";
 import FloatingNotes from "../components/FloatingNotes";
+import CalendarPrivacyModal from "../components/CalendarPrivacyModal";
 
 // Indian classical instrument mapping
 const ROLE_BADGES = {
@@ -76,6 +80,7 @@ export default function Dashboard() {
   const [artists, setArtists] = useState([]);
   const [mounted, setMounted] = useState(false);
   const [selectedArtistId, setSelectedArtistId] = useState("me");
+  const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
 
   const today = new Date();
   const [viewDate, setViewDate] = useState(
@@ -91,7 +96,8 @@ export default function Dashboard() {
 
   const loadDashboardData = useCallback(async (targetId = selectedArtistId) => {
     try {
-      const res = await getDashboard(targetId);
+      const viewer = getCurrentUser();
+      const res = await getDashboard(targetId, viewer);
       setData(res);
       if (targetId === "all") {
         const notes = await getNotifications("all");
@@ -113,9 +119,11 @@ export default function Dashboard() {
     getAllArtists().then(setArtists);
     setMounted(true);
 
-    function onUserChanged() {
+    async function onUserChanged() {
       const u = getCurrentUser();
       setLoggedInUser(u);
+      const freshArtists = await getAllArtists();
+      setArtists(freshArtists);
       loadDashboardData(selectedArtistId);
     }
     window.addEventListener("swarsethu:userChanged", onUserChanged);
@@ -125,6 +133,10 @@ export default function Dashboard() {
   // Handle switching artist schedule from dropdown WITHOUT switching logged-in account
   const handleArtistChange = async (artistId) => {
     setSelectedArtistId(artistId);
+
+    // Refresh artists list to ensure latest privacy settings are active
+    const fresh = await getAllArtists();
+    setArtists(fresh);
 
     if (artistId === "all") {
       await loadDashboardData("all");
@@ -141,6 +153,32 @@ export default function Dashboard() {
     await loadDashboardData(artistId);
   };
 
+  // Switch active logged-in account (useful for testing calendar privacy between accounts)
+  const handleSwitchAccount = async (artistIdOrEmail) => {
+    const freshArtists = await getAllArtists();
+    setArtists(freshArtists);
+
+    const target = freshArtists.find(
+      (a) =>
+        String(a.id || "").toLowerCase() === String(artistIdOrEmail).toLowerCase() ||
+        String(a.email || "").toLowerCase() === String(artistIdOrEmail).toLowerCase() ||
+        String(a.username || "").toLowerCase() === String(artistIdOrEmail).toLowerCase() ||
+        String(a.name || "").toLowerCase() === String(artistIdOrEmail).toLowerCase()
+    );
+    if (target) {
+      setCurrentUserObj(target);
+      setLoggedInUser(target);
+      await loadDashboardData(selectedArtistId);
+    }
+  };
+
+  const handlePrivacySaved = async (updatedUser) => {
+    setLoggedInUser(updatedUser);
+    const updatedArtists = await getAllArtists();
+    setArtists(updatedArtists);
+    await loadDashboardData(selectedArtistId);
+  };
+
   // Entrance animations
   useEffect(() => {
     if (!mounted) return;
@@ -153,8 +191,29 @@ export default function Dashboard() {
     }
   }, [mounted]);
 
+  const isInspectingOther = selectedArtistId !== "me" && selectedArtistId !== "all";
+  const inspectedArtist = isInspectingOther
+    ? artists.find(
+        (a) =>
+          String(a.id).toLowerCase() === String(selectedArtistId).toLowerCase() ||
+          a.email?.toLowerCase() === String(selectedArtistId).toLowerCase() ||
+          a.username?.toLowerCase() === String(selectedArtistId).toLowerCase()
+      ) || data.currentUser
+    : null;
+
+  const accessCheck = useMemo(() => {
+    if (!isInspectingOther || !inspectedArtist) return { allowed: true, mode: "public" };
+    return checkCalendarAccess(inspectedArtist, loggedInUser);
+  }, [isInspectingOther, inspectedArtist, loggedInUser]);
+
+  const isCalendarRestricted = Boolean(data.isCalendarHidden || !accessCheck.allowed);
+
   // Read all accepted events and sessions for the viewed artist or ensemble
   const events = useMemo(() => {
+    if (isCalendarRestricted || data.isCalendarHidden) {
+      return [];
+    }
+
     const sessionMap = {};
     const artistMap = {};
     artists.forEach((a) => (artistMap[a.id] = a));
@@ -232,14 +291,22 @@ export default function Dashboard() {
     const seen = new Set();
     return all.filter((ev) => {
       if (!ev.day) return false;
+      if (selectedArtistId === "all") {
+        const evArtist = artistMap[ev.artistId] || artists.find((a) => a.id === ev.artistId || a.name === ev.artistName);
+        if (evArtist) {
+          const acc = checkCalendarAccess(evArtist, loggedInUser);
+          if (!acc.allowed) return false;
+        }
+      }
       const key = `${ev.day}_${ev.title}_${ev.time}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [data, artists]);
+  }, [data, artists, isCalendarRestricted, selectedArtistId, loggedInUser]);
 
   function eventsForDate(date) {
+    if (isCalendarRestricted) return [];
     return events.filter((e) => e.day === date);
   }
 
@@ -259,11 +326,6 @@ export default function Dashboard() {
     ? data.invitations.filter((i) => i.status === "pending")
     : []
   ).length;
-
-  const isInspectingOther = selectedArtistId !== "me" && selectedArtistId !== "all";
-  const inspectedArtist = isInspectingOther
-    ? artists.find((a) => a.id === selectedArtistId) || data.currentUser
-    : null;
 
   const selectedDateEvents = eventsForDate(selectedDate);
   const isSelectedDateBusy = selectedDateEvents.length > 0;
@@ -300,11 +362,11 @@ export default function Dashboard() {
             </div>
 
             {/* Logged-In User Profile + Availability Checker Dropdown */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-3xl backdrop-blur-xl bg-white/[0.04] border border-white/[0.09] shadow-xl">
+            <div className="flex flex-col xl:flex-row items-start xl:items-center gap-3 p-3.5 rounded-3xl backdrop-blur-xl bg-white/[0.04] border border-white/[0.09] shadow-xl">
               {/* Logged in Maestro (Never changes when checking others) */}
               <div className="flex items-center gap-3">
                 <div
-                  className="w-11 h-11 rounded-2xl flex items-center justify-center font-black text-amber-200 border border-amber-400/40 text-base shadow-md"
+                  className="w-11 h-11 rounded-2xl flex items-center justify-center font-black text-amber-200 border border-amber-400/40 text-base shadow-md flex-shrink-0"
                   style={{
                     background: "linear-gradient(135deg, #d97706, #7c3aed)",
                   }}
@@ -321,6 +383,51 @@ export default function Dashboard() {
                   <div className="text-[11px] font-semibold text-purple-300/80 capitalize">
                     {loggedInUser?.role || "Classical Artist"}
                   </div>
+
+                  {/* Calendar Policy Status Indicator */}
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setPrivacyModalOpen(true)}
+                      className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1.5 shadow-sm whitespace-nowrap cursor-pointer transition-transform hover:scale-105"
+                      style={{
+                        background:
+                          loggedInUser?.calendar_visibility === "private"
+                            ? "rgba(244,63,94,0.18)"
+                            : loggedInUser?.calendar_visibility === "blacklist" || loggedInUser?.calendar_visibility === "whitelist"
+                            ? "rgba(168,85,247,0.18)"
+                            : "rgba(16,185,129,0.18)",
+                        borderColor:
+                          loggedInUser?.calendar_visibility === "private"
+                            ? "rgba(244,63,94,0.4)"
+                            : loggedInUser?.calendar_visibility === "blacklist" || loggedInUser?.calendar_visibility === "whitelist"
+                            ? "rgba(168,85,247,0.4)"
+                            : "rgba(16,185,129,0.4)",
+                        color:
+                          loggedInUser?.calendar_visibility === "private"
+                            ? "#fecdd3"
+                            : loggedInUser?.calendar_visibility === "blacklist" || loggedInUser?.calendar_visibility === "whitelist"
+                            ? "#f5d0fe"
+                            : "#a7f3d0",
+                      }}
+                      title="Current calendar visibility policy. Click to change policy."
+                    >
+                      <span className="text-xs">
+                        {loggedInUser?.calendar_visibility === "private"
+                          ? "🔒"
+                          : loggedInUser?.calendar_visibility === "blacklist" || loggedInUser?.calendar_visibility === "whitelist"
+                          ? "🚫"
+                          : "🌐"}
+                      </span>
+                      <span>
+                        {loggedInUser?.calendar_visibility === "private"
+                          ? "Calendar: Private"
+                          : loggedInUser?.calendar_visibility === "blacklist" || loggedInUser?.calendar_visibility === "whitelist"
+                          ? "Calendar: Partial"
+                          : "Calendar: Public"}
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 {pendingCount > 0 && (
@@ -331,14 +438,14 @@ export default function Dashboard() {
               </div>
 
               {/* Dynamic Availability Checker Dropdown */}
-              <div className="sm:border-l sm:border-white/10 sm:pl-3 w-full sm:w-auto flex flex-col gap-1">
+              <div className="xl:border-l xl:border-white/10 xl:pl-3 w-full xl:w-auto flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1">
                   <span>📅</span> Check Artist Availability:
                 </label>
                 <select
                   value={selectedArtistId}
                   onChange={(e) => handleArtistChange(e.target.value)}
-                  className="text-xs font-bold rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer text-amber-200 transition-all shadow-md w-full sm:w-auto"
+                  className="text-xs font-bold rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer text-amber-200 transition-all shadow-md w-full xl:w-auto"
                   style={{
                     background: "linear-gradient(135deg, #1b0a33 0%, #0d041c 100%)",
                     border: "1px solid rgba(251,191,36,0.4)",
@@ -347,12 +454,41 @@ export default function Dashboard() {
                   <option value="me">👤 My Schedule ({loggedInUser?.name || "Logged In"})</option>
                   <option value="all">🌐 All Ensemble Schedule</option>
                   <optgroup label="── Check Specific Artist Availability ──">
-                    {artists.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        🔍 Check: {a.name} ({a.role})
-                      </option>
-                    ))}
+                    {artists.map((a) => {
+                      const acc = checkCalendarAccess(a, loggedInUser);
+                      const isRestricted = !acc.allowed;
+                      return (
+                        <option key={a.id} value={a.id}>
+                          {isRestricted
+                            ? `🔒 ${a.name} (${a.role}) — Calendar Hidden`
+                            : `🔍 Check: ${a.name} (${a.role})`}
+                        </option>
+                      );
+                    })}
                   </optgroup>
+                </select>
+              </div>
+
+              {/* Account Switcher (For testing privacy permissions between different artists) */}
+              <div className="xl:border-l xl:border-white/10 xl:pl-3 flex flex-col gap-1 w-full xl:w-auto">
+                <label className="text-[10px] font-bold text-purple-300/80 uppercase tracking-wider flex items-center gap-1">
+                  <span>🎭</span> Test As Another User:
+                </label>
+                <select
+                  value={loggedInUser?.id || loggedInUser?.email || ""}
+                  onChange={(e) => handleSwitchAccount(e.target.value)}
+                  className="text-xs font-bold rounded-xl px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer text-purple-200 transition-all shadow-md w-full xl:w-auto"
+                  style={{
+                    background: "linear-gradient(135deg, #16082e 0%, #0c0419 100%)",
+                    border: "1px solid rgba(192,132,252,0.35)",
+                  }}
+                  title="Switch logged-in maestro to test visibility rules from another perspective"
+                >
+                  {artists.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      👤 {a.name} ({a.role})
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -382,47 +518,78 @@ export default function Dashboard() {
                     {inspectedArtist?.name} · <span className="text-amber-200">{inspectedArtist?.role}</span>
                   </div>
                   <div className="text-xs text-purple-300/70">
-                    Checking calendar to see if maestro is free or busy on selected dates
+                    {isCalendarRestricted
+                      ? accessCheck.reason ||
+                        `${inspectedArtist?.name} has restricted calendar access. Specific bookings and schedule are hidden.`
+                      : "Checking calendar to see if maestro is free or busy on selected dates"}
                   </div>
                 </div>
               </div>
 
               {/* Status for selected date */}
               <div className="flex flex-wrap items-center gap-3">
-                <div
-                  className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider border flex items-center gap-2 ${
-                    isSelectedDateBusy
-                      ? "bg-red-500/20 text-red-300 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.25)]"
-                      : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.25)]"
-                  }`}
-                >
-                  <span className="text-base">{isSelectedDateBusy ? "🔴" : "🟢"}</span>
-                  <span>
-                    {isSelectedDateBusy ? "BUSY / BOOKED" : "FREE & AVAILABLE"} on {selectedDate}
-                  </span>
-                </div>
+                {isCalendarRestricted ? (
+                  <>
+                    <div className="px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider border flex items-center gap-2 bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                      <span className="text-base">🔒</span>
+                      <span>SCHEDULE PRIVATE</span>
+                    </div>
 
-                {!isSelectedDateBusy ? (
-                  <button
-                    onClick={() =>
-                      navigate(
-                        `/schedule?artistId=${inspectedArtist?.id}&name=${encodeURIComponent(
-                          inspectedArtist?.name || ""
-                        )}&role=${encodeURIComponent(inspectedArtist?.role || "")}&date=${selectedDate}`
-                      )
-                    }
-                    className="px-5 py-2.5 rounded-2xl text-xs font-black text-amber-950 transition-all hover:scale-105 shadow-xl cursor-pointer flex items-center gap-1.5"
-                    style={{
-                      background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%)",
-                      boxShadow: "0 8px 20px rgba(245, 158, 11, 0.35)",
-                    }}
-                  >
-                    <span>✨</span> Send Concert Invite →
-                  </button>
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/schedule?artistId=${inspectedArtist?.id}&name=${encodeURIComponent(
+                            inspectedArtist?.name || ""
+                          )}&role=${encodeURIComponent(inspectedArtist?.role || "")}&date=${selectedDate}`
+                        )
+                      }
+                      className="px-5 py-2.5 rounded-2xl text-xs font-black text-amber-950 transition-all hover:scale-105 shadow-xl cursor-pointer flex items-center gap-1.5"
+                      style={{
+                        background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%)",
+                        boxShadow: "0 8px 20px rgba(245, 158, 11, 0.35)",
+                      }}
+                    >
+                      <span>✨</span> Propose Concert Booking →
+                    </button>
+                  </>
                 ) : (
-                  <div className="text-xs font-semibold text-red-300/80 px-2">
-                    ⚠️ Conflicted — Cannot invite for this date
-                  </div>
+                  <>
+                    <div
+                      className={`px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider border flex items-center gap-2 ${
+                        isSelectedDateBusy
+                          ? "bg-red-500/20 text-red-300 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+                          : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.25)]"
+                      }`}
+                    >
+                      <span className="text-base">{isSelectedDateBusy ? "🔴" : "🟢"}</span>
+                      <span>
+                        {isSelectedDateBusy ? "BUSY / BOOKED" : "FREE & AVAILABLE"} on {selectedDate}
+                      </span>
+                    </div>
+
+                    {!isSelectedDateBusy ? (
+                      <button
+                        onClick={() =>
+                          navigate(
+                            `/schedule?artistId=${inspectedArtist?.id}&name=${encodeURIComponent(
+                              inspectedArtist?.name || ""
+                            )}&role=${encodeURIComponent(inspectedArtist?.role || "")}&date=${selectedDate}`
+                          )
+                        }
+                        className="px-5 py-2.5 rounded-2xl text-xs font-black text-amber-950 transition-all hover:scale-105 shadow-xl cursor-pointer flex items-center gap-1.5"
+                        style={{
+                          background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%)",
+                          boxShadow: "0 8px 20px rgba(245, 158, 11, 0.35)",
+                        }}
+                      >
+                        <span>✨</span> Send Concert Invite →
+                      </button>
+                    ) : (
+                      <div className="text-xs font-semibold text-red-300/80 px-2">
+                        ⚠️ Conflicted — Cannot invite for this date
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <button
@@ -439,10 +606,26 @@ export default function Dashboard() {
         {/* ── Metric Cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
-            { icon: "🪕", label: "Confirmed Concerts", value: data.myConcerts.length },
-            { icon: "📨", label: "Invites Received", value: data.invitations.length },
-            { icon: "📤", label: "Invites Dispatched", value: data.sentInvitations.length },
-            { icon: "✅", label: "Troupe Harmony", value: events.length },
+            {
+              icon: "🪕",
+              label: isInspectingOther ? `${inspectedArtist?.name}'s Concerts` : "Confirmed Concerts",
+              value: isCalendarRestricted ? "🔒 Private" : data.myConcerts.length,
+            },
+            {
+              icon: "📨",
+              label: "Invites Received",
+              value: isCalendarRestricted ? "🔒 Hidden" : data.invitations.length,
+            },
+            {
+              icon: "📤",
+              label: "Invites Dispatched",
+              value: isCalendarRestricted ? "🔒 Hidden" : data.sentInvitations.length,
+            },
+            {
+              icon: "✅",
+              label: "Troupe Harmony",
+              value: isCalendarRestricted ? "🔒 Hidden" : events.length,
+            },
           ].map((stat, i) => (
             <div
               key={stat.label}
@@ -450,13 +633,29 @@ export default function Dashboard() {
             >
               <div className="text-3xl mb-2">{stat.icon}</div>
               <div
-                className="text-3xl font-black"
+                className={`${
+                  typeof stat.value === "string" && stat.value.includes("🔒")
+                    ? "text-xl text-amber-300"
+                    : "text-3xl"
+                } font-black`}
                 style={{
                   fontFamily: "'Outfit', sans-serif",
-                  background: "linear-gradient(135deg, #fef08a, #f59e0b)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
+                  background:
+                    typeof stat.value === "string" && stat.value.includes("🔒")
+                      ? undefined
+                      : "linear-gradient(135deg, #fef08a, #f59e0b)",
+                  WebkitBackgroundClip:
+                    typeof stat.value === "string" && stat.value.includes("🔒")
+                      ? undefined
+                      : "text",
+                  WebkitTextFillColor:
+                    typeof stat.value === "string" && stat.value.includes("🔒")
+                      ? undefined
+                      : "transparent",
+                  backgroundClip:
+                    typeof stat.value === "string" && stat.value.includes("🔒")
+                      ? undefined
+                      : "text",
                 }}
               >
                 {stat.value}
@@ -471,13 +670,84 @@ export default function Dashboard() {
         {/* ── Main Workspace: Calendar & Acoustic Visualizer ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
-          {/* Calendar Box (2 cols) */}
-          <div
-            ref={calRef}
-            className="lg:col-span-2 card-luxury p-6 sm:p-8"
-          >
-            {/* Calendar Controls */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+          {isCalendarRestricted ? (
+            /* COMPLETELY HIDDEN CALENDAR STATE */
+            <div
+              className="lg:col-span-3 card-luxury p-10 sm:p-16 text-center flex flex-col items-center justify-center min-h-[480px] animate-fadeIn"
+              style={{
+                background:
+                  "radial-gradient(circle at 50% 30%, rgba(245,158,11,0.08) 0%, rgba(12,4,26,0.98) 75%)",
+                border: "1px solid rgba(251,191,36,0.35)",
+                boxShadow: "0 25px 60px -15px rgba(0,0,0,0.8), 0 0 50px rgba(245,158,11,0.1)",
+              }}
+            >
+              <div
+                className="w-24 h-24 rounded-3xl flex items-center justify-center text-5xl mb-6 shadow-2xl"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(225,29,72,0.25) 100%)",
+                  border: "2px solid rgba(251,191,36,0.4)",
+                  boxShadow: "0 0 40px rgba(245,158,11,0.25)",
+                }}
+              >
+                🔒
+              </div>
+              <div
+                className="text-2xl sm:text-3xl font-black mb-3"
+                style={{
+                  fontFamily: "'Outfit', sans-serif",
+                  background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #f43f5e 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                Calendar is Hidden & Private
+              </div>
+              <p className="text-sm text-purple-200/80 max-w-lg mx-auto mb-8 leading-relaxed">
+                {accessCheck.reason ||
+                  `${inspectedArtist?.name} has set their concert schedule to Only Me (Private). Their calendar dates, bookings, and availability are completely hidden from other artists.`}
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/schedule?artistId=${inspectedArtist?.id}&name=${encodeURIComponent(
+                        inspectedArtist?.name || ""
+                      )}&role=${encodeURIComponent(inspectedArtist?.role || "")}`
+                    )
+                  }
+                  className="px-6 py-3.5 rounded-2xl text-xs font-black text-amber-950 transition-all hover:scale-105 shadow-xl cursor-pointer flex items-center gap-2"
+                  style={{
+                    background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%)",
+                    boxShadow: "0 8px 24px rgba(245,158,11,0.4)",
+                  }}
+                >
+                  <span>✨</span>
+                  <span>Propose Concert Booking to {inspectedArtist?.name} →</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleArtistChange("me")}
+                  className="px-5 py-3.5 rounded-2xl text-xs font-bold text-purple-200 bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer flex items-center gap-2"
+                >
+                  <span>←</span>
+                  <span>Back to My Calendar</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Calendar Box (2 cols) */}
+              <div
+                ref={calRef}
+                className="lg:col-span-2 card-luxury p-6 sm:p-8"
+              >
+                {/* Calendar Controls */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
               <div>
                 <h3
                   className="text-2xl font-black"
@@ -683,12 +953,18 @@ export default function Dashboard() {
                 {isInspectingOther && (
                   <span
                     className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
-                      eventsForDate(selectedDate).length > 0
+                      isCalendarRestricted
+                        ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                        : eventsForDate(selectedDate).length > 0
                         ? "bg-red-500/20 text-red-300 border-red-500/40"
                         : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                     }`}
                   >
-                    {eventsForDate(selectedDate).length > 0 ? "🔴 Booked" : "🟢 Available"}
+                    {isCalendarRestricted
+                      ? "🔒 Restricted"
+                      : eventsForDate(selectedDate).length > 0
+                      ? "🔴 Booked"
+                      : "🟢 Available"}
                   </span>
                 )}
               </div>
@@ -697,30 +973,57 @@ export default function Dashboard() {
               <div className="space-y-3 max-h-[300px] overflow-auto pr-1">
                 {eventsForDate(selectedDate).length === 0 ? (
                   isInspectingOther ? (
-                    <div className="text-center py-6 px-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
-                      <div className="text-4xl mb-2">🟢</div>
-                      <div className="text-sm font-bold text-emerald-300 mb-1">
-                        {inspectedArtist?.name} is Free on this Date!
+                    isCalendarRestricted ? (
+                      <div className="text-center py-7 px-4 rounded-2xl bg-amber-500/10 border border-amber-500/30">
+                        <div className="text-4xl mb-2">🔒</div>
+                        <div className="text-sm font-bold text-amber-300 mb-1">
+                          Calendar Schedule Restricted
+                        </div>
+                        <p className="text-xs text-purple-200/70 mb-4 leading-relaxed">
+                          {inspectedArtist?.name} has kept their concert calendar and availability private from your account. You can still propose a concert booking for this date.
+                        </p>
+                        <button
+                          onClick={() =>
+                            navigate(
+                              `/schedule?artistId=${inspectedArtist?.id}&name=${encodeURIComponent(
+                                inspectedArtist?.name || ""
+                              )}&role=${encodeURIComponent(inspectedArtist?.role || "")}&date=${selectedDate}`
+                            )
+                          }
+                          className="px-5 py-2.5 rounded-xl text-xs font-black text-amber-950 transition-all hover:scale-105 shadow-md cursor-pointer"
+                          style={{
+                            background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%)",
+                          }}
+                        >
+                          ✨ Propose Concert for this Date →
+                        </button>
                       </div>
-                      <p className="text-xs text-purple-200/70 mb-4">
-                        No concerts booked for {selectedDate}. You can safely invite them for your concert troupe.
-                      </p>
-                      <button
-                        onClick={() =>
-                          navigate(
-                            `/schedule?artistId=${inspectedArtist?.id}&name=${encodeURIComponent(
-                              inspectedArtist?.name || ""
-                            )}&role=${encodeURIComponent(inspectedArtist?.role || "")}&date=${selectedDate}`
-                          )
-                        }
-                        className="px-5 py-2.5 rounded-xl text-xs font-black text-amber-950 transition-all hover:scale-105 shadow-md cursor-pointer"
-                        style={{
-                          background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%)",
-                        }}
-                      >
-                        ✨ Invite {inspectedArtist?.name} for this Date →
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="text-center py-6 px-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
+                        <div className="text-4xl mb-2">🟢</div>
+                        <div className="text-sm font-bold text-emerald-300 mb-1">
+                          {inspectedArtist?.name} is Free on this Date!
+                        </div>
+                        <p className="text-xs text-purple-200/70 mb-4">
+                          No concerts booked for {selectedDate}. You can safely invite them for your concert troupe.
+                        </p>
+                        <button
+                          onClick={() =>
+                            navigate(
+                              `/schedule?artistId=${inspectedArtist?.id}&name=${encodeURIComponent(
+                                inspectedArtist?.name || ""
+                              )}&role=${encodeURIComponent(inspectedArtist?.role || "")}&date=${selectedDate}`
+                            )
+                          }
+                          className="px-5 py-2.5 rounded-xl text-xs font-black text-amber-950 transition-all hover:scale-105 shadow-md cursor-pointer"
+                          style={{
+                            background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%)",
+                          }}
+                        >
+                          ✨ Invite {inspectedArtist?.name} for this Date →
+                        </button>
+                      </div>
+                    )
                   ) : (
                     <div className="text-center py-8">
                       <div className="text-4xl mb-2">🪕</div>
@@ -777,7 +1080,9 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-        </div>
+          </>
+        )}
+      </div>
 
         {/* ── Invitations & Notifications Section ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -908,6 +1213,14 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Calendar Visibility & Privacy Manager Modal */}
+      <CalendarPrivacyModal
+        isOpen={privacyModalOpen}
+        onClose={() => setPrivacyModalOpen(false)}
+        currentUser={loggedInUser}
+        onSaved={handlePrivacySaved}
+      />
     </div>
   );
 }

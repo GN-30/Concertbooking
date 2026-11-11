@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS public.artists (
     role TEXT NOT NULL DEFAULT 'vocal', -- vocal, mrudangist, tabla, violinist, flutist, harmonist, veena
     bio TEXT,
     location TEXT DEFAULT 'Chennai, India',
+    calendar_visibility TEXT DEFAULT 'public', -- 'public', 'whitelist', 'blacklist', 'private'
+    calendar_allowed_users TEXT[] DEFAULT '{}', -- user IDs or emails permitted to view calendar
+    calendar_hidden_users TEXT[] DEFAULT '{}', -- user IDs or emails hidden from viewing calendar
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

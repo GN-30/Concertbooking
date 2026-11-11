@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { gsap } from "gsap";
 import FloatingNotes from "../components/FloatingNotes";
-import { getAllArtists } from "../services/api";
+import { getAllArtists, getCurrentUser, checkCalendarAccess } from "../services/api";
 
 const ROLE_EMOJIS = {
   vocal: "🎤",
@@ -85,6 +85,9 @@ export default function ArtistPublic() {
 
   const role = artist.role?.toLowerCase() || "vocal";
   const emoji = ROLE_EMOJIS[role] || "🎵";
+
+  const currentUser = getCurrentUser();
+  const accessCheck = checkCalendarAccess(artist, currentUser);
 
   return (
     <div
@@ -183,7 +186,28 @@ export default function ArtistPublic() {
             <span>🎪</span> Public Schedule & Confirmed Concerts
           </h3>
 
-          {events.length === 0 ? (
+          {!accessCheck.allowed ? (
+            <div className="text-center py-10 px-4 rounded-2xl bg-amber-500/10 border border-amber-500/30">
+              <div className="text-4xl mb-2">🔒</div>
+              <div className="text-sm font-bold text-amber-300 mb-1">
+                Calendar Schedule Restricted
+              </div>
+              <p className="text-xs text-purple-200/70 mb-4 max-w-md mx-auto leading-relaxed">
+                {accessCheck.reason || `${artist.name} has kept their concert schedule and booking availability private.`}
+              </p>
+              <Link
+                to={`/schedule?artistId=${artist.id}&name=${encodeURIComponent(
+                  artist.name || ""
+                )}&role=${encodeURIComponent(artist.role || "")}`}
+                className="inline-block px-5 py-2.5 rounded-xl text-xs font-black text-amber-950 transition-all hover:scale-105 shadow-md"
+                style={{
+                  background: "linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%)",
+                }}
+              >
+                ✨ Propose Concert Booking →
+              </Link>
+            </div>
+          ) : events.length === 0 ? (
             <div className="text-center py-10">
               <div className="text-4xl mb-2">🎻</div>
               <p className="text-purple-300/60 text-sm">No confirmed concerts currently scheduled.</p>

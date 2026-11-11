@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import React from "react";
+import { Routes, Route } from "react-router-dom";
 
 import Header from "./components/Header";
 import NotificationToast from "./components/NotificationToast";
@@ -13,10 +13,8 @@ import Register from "./pages/Register";
 import Artists from "./pages/Artists";
 import AuthPage from "./pages/auth";
 import ArtistPublic from "./pages/ArtistPublic";
-import auth from "./services/auth";
 
 export default function App() {
-  // Note: do not force-redirect to /auth so /register remains accessible
   return (
     <div className="min-h-screen" style={{ background: "#050010", color: "white" }}>
       <Header />

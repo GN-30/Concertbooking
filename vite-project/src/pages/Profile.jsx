@@ -1,7 +1,7 @@
-// src/pages/Profile.jsx
 import React, { useState, useEffect } from "react";
 import { getCurrentUser } from "../services/api";
 import FloatingNotes from "../components/FloatingNotes";
+import CalendarPrivacyModal from "../components/CalendarPrivacyModal";
 import { Link } from "react-router-dom";
 
 const ROLE_EMOJIS = {
@@ -18,8 +18,10 @@ export default function Profile() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const u = getCurrentUser();
-    setUser(u);
+    setUser(getCurrentUser());
+    const onUserChanged = () => setUser(getCurrentUser());
+    window.addEventListener("swarsethu:userChanged", onUserChanged);
+    return () => window.removeEventListener("swarsethu:userChanged", onUserChanged);
   }, []);
 
   const role = user?.role?.toLowerCase() || "artist";
@@ -52,7 +54,7 @@ export default function Profile() {
             backgroundClip: "text",
           }}
         >
-          🎵 Artist Profile
+          🎵 Artist Profile & Privacy
         </h2>
 
         <div
@@ -80,7 +82,7 @@ export default function Profile() {
               <p className="text-sm text-purple-300 font-mono">
                 {user?.email || "No email available"}
               </p>
-              <div className="pt-2">
+              <div className="pt-2 flex flex-wrap gap-2 items-center justify-center sm:justify-start">
                 <span
                   className="inline-block text-xs font-bold px-3 py-1 rounded-full capitalize"
                   style={{
@@ -90,6 +92,32 @@ export default function Profile() {
                   }}
                 >
                   {emoji} {user?.role || "Artist"}
+                </span>
+
+                <span
+                  className="inline-block text-xs font-bold px-3 py-1 rounded-full uppercase"
+                  style={{
+                    background:
+                      user?.calendar_visibility === "private"
+                        ? "rgba(244,63,94,0.2)"
+                        : user?.calendar_visibility === "blacklist" || user?.calendar_visibility === "whitelist"
+                        ? "rgba(168,85,247,0.2)"
+                        : "rgba(16,185,129,0.2)",
+                    color:
+                      user?.calendar_visibility === "private"
+                        ? "#fecdd3"
+                        : user?.calendar_visibility === "blacklist" || user?.calendar_visibility === "whitelist"
+                        ? "#f5d0fe"
+                        : "#a7f3d0",
+                    border:
+                      user?.calendar_visibility === "private"
+                        ? "1px solid rgba(244,63,94,0.4)"
+                        : user?.calendar_visibility === "blacklist" || user?.calendar_visibility === "whitelist"
+                        ? "1px solid rgba(168,85,247,0.4)"
+                        : "1px solid rgba(16,185,129,0.4)",
+                  }}
+                >
+                  🛡️ {user?.calendar_visibility === "private" ? "Private" : user?.calendar_visibility === "blacklist" || user?.calendar_visibility === "whitelist" ? "Partial" : "Public"} Calendar
                 </span>
               </div>
             </div>
@@ -109,6 +137,15 @@ export default function Profile() {
             <div className="flex justify-between items-center text-xs py-2 border-b border-white/10">
               <span className="text-purple-300 font-semibold">Username:</span>
               <span className="font-mono text-pink-300">@{user?.username || user?.email?.split("@")[0] || "—"}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs py-2 border-b border-white/10">
+              <span className="text-purple-300 font-semibold">Calendar Visibility:</span>
+              <span className="font-semibold text-amber-300 capitalize">
+                {user?.calendar_visibility === "whitelist" && "Partial (Selected Artists Only)"}
+                {user?.calendar_visibility === "blacklist" && "Partial (Hidden from Specific Artists)"}
+                {user?.calendar_visibility === "private" && "Private (Strictly Only Me)"}
+                {(!user?.calendar_visibility || user?.calendar_visibility === "public") && "Public (Everyone)"}
+              </span>
             </div>
             <div className="flex justify-between items-center text-xs py-2">
               <span className="text-purple-300 font-semibold">Status:</span>
@@ -138,6 +175,15 @@ export default function Profile() {
             </Link>
           </div>
         </div>
+
+        {/* Embedded Calendar Privacy Manager */}
+        {user && (
+          <CalendarPrivacyModal
+            inline={true}
+            currentUser={user}
+            onSaved={(updated) => setUser(updated)}
+          />
+        )}
       </div>
     </div>
   );

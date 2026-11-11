@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { gsap } from 'gsap';
 import auth from '../services/auth';
-import { getCurrentUser } from '../services/api';
+import { getCurrentUser, setCurrentUserObj } from '../services/api';
+import CalendarPrivacyModal from './CalendarPrivacyModal';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', icon: '🏠' },
@@ -17,6 +18,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [scrolled, setScrolled] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const navigate = useNavigate();
   const headerRef = useRef(null);
 
@@ -26,6 +28,11 @@ export default function Header() {
     window.addEventListener('swarsethu:userChanged', onUserChange);
     return () => window.removeEventListener('swarsethu:userChanged', onUserChange);
   }, [location.pathname]);
+
+  const handlePrivacySaved = (updatedUser) => {
+    setUser(updatedUser);
+    setCurrentUserObj(updatedUser);
+  };
 
   useEffect(() => {
     function handleScroll() { setScrolled(window.scrollY > 20); }
@@ -45,6 +52,7 @@ export default function Header() {
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
   return (
+    <>
     <header
       ref={headerRef}
       className="sticky top-0 z-50 transition-all duration-500"
@@ -127,7 +135,7 @@ export default function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center">
+          <nav className="hidden md:flex items-center gap-2">
             <div
               className="flex items-center gap-1 p-1 rounded-2xl"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
@@ -173,6 +181,51 @@ export default function Header() {
                 );
               })}
             </div>
+
+            {/* Privacy Button with dynamic live policy status */}
+            {user && (() => {
+              const isPrivate = user.calendar_visibility === "private";
+              const isPartial = user.calendar_visibility === "blacklist" || user.calendar_visibility === "whitelist";
+              const statusLabel = isPrivate ? "Private" : isPartial ? "Partial" : "Public";
+              const badgeColor = isPrivate ? "#f43f5e" : isPartial ? "#c084fc" : "#10b981";
+              const bgStyle = isPrivate
+                ? "rgba(244,63,94,0.14)"
+                : isPartial
+                ? "rgba(168,85,247,0.14)"
+                : "rgba(16,185,129,0.14)";
+              const borderStyle = isPrivate
+                ? "1px solid rgba(244,63,94,0.35)"
+                : isPartial
+                ? "1px solid rgba(168,85,247,0.35)"
+                : "1px solid rgba(16,185,129,0.35)";
+
+              return (
+                <button
+                  type="button"
+                  onClick={() => setPrivacyOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 hover:scale-105 cursor-pointer whitespace-nowrap shadow-sm"
+                  style={{
+                    background: bgStyle,
+                    border: borderStyle,
+                    color: "#fff",
+                  }}
+                  title={`Calendar Privacy is currently ${statusLabel}. Click to change policy.`}
+                >
+                  <span className="text-sm">🛡️</span>
+                  <span>Privacy</span>
+                  <span
+                    className="text-[10px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider ml-0.5"
+                    style={{
+                      background: "rgba(0,0,0,0.4)",
+                      color: badgeColor,
+                      border: `1px solid ${badgeColor}33`,
+                    }}
+                  >
+                    {statusLabel}
+                  </span>
+                </button>
+              );
+            })()}
           </nav>
 
           {/* Auth Section */}
@@ -295,13 +348,46 @@ export default function Header() {
                   <div className="text-amber-300 text-[10px] capitalize">{user.role}</div>
                 </div>
               </div>
-              <button
-                onClick={() => { auth.logout(); navigate('/auth'); setMenuOpen(false); }}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-300"
-                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
-              >
-                Sign Out
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Mobile Privacy Button with status */}
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); setPrivacyOpen(true); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer"
+                  style={{
+                    background:
+                      user.calendar_visibility === "private"
+                        ? "rgba(244,63,94,0.18)"
+                        : user.calendar_visibility === "blacklist" || user.calendar_visibility === "whitelist"
+                        ? "rgba(168,85,247,0.18)"
+                        : "rgba(16,185,129,0.18)",
+                    border:
+                      user.calendar_visibility === "private"
+                        ? "1px solid rgba(244,63,94,0.4)"
+                        : user.calendar_visibility === "blacklist" || user.calendar_visibility === "whitelist"
+                        ? "1px solid rgba(168,85,247,0.4)"
+                        : "1px solid rgba(16,185,129,0.4)",
+                    color: "#fff",
+                  }}
+                >
+                  <span>🛡️</span>
+                  <span>
+                    Privacy:{" "}
+                    {user.calendar_visibility === "private"
+                      ? "Private"
+                      : user.calendar_visibility === "blacklist" || user.calendar_visibility === "whitelist"
+                      ? "Partial"
+                      : "Public"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => { auth.logout(); navigate('/auth'); setMenuOpen(false); }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-300"
+                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
+                >
+                  Sign Out
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex gap-2 pt-1">
@@ -326,5 +412,16 @@ export default function Header() {
         </div>
       </div>
     </header>
+
+      {/* Calendar Privacy Modal */}
+      {user && (
+        <CalendarPrivacyModal
+          isOpen={privacyOpen}
+          onClose={() => setPrivacyOpen(false)}
+          currentUser={user}
+          onSaved={handlePrivacySaved}
+        />
+      )}
+    </>
   );
 }
