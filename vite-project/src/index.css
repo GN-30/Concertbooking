@@ -230,3 +230,235 @@ input[type='number']::-webkit-inner-spin-button, input[type='number']::-webkit-o
 .animate-spin-slow { animation: spin-slow 12s linear infinite; }
 .animate-fade-in-up { animation: fade-in-up 0.6s ease-out both; }
 .animate-scale-in { animation: scale-in 0.5s ease-out both; }
+
+/* ========================================================
+   LIGHT THEME OVERRIDES (Palace Ivory / Golden Alabaster)
+   ======================================================== */
+
+html.light,
+body.light,
+.light {
+  color-scheme: light;
+  background-color: #faf7f2 !important;
+  color: #1e112a !important;
+}
+
+html.light body {
+  background: #faf7f2 !important;
+  color: #1e112a !important;
+}
+
+/* Scrollbar in Light Mode */
+html.light ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(217, 119, 6, 0.35);
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(217, 119, 6, 0.65);
+}
+
+/* App Container & Page Wrapper in Light Mode */
+html.light .app-container,
+html.light .page-wrapper {
+  background: radial-gradient(ellipse at 50% 0%, #fef3c7 0%, #faf5ee 45%, #f4eee2 100%) !important;
+  color: #1e112a !important;
+}
+
+/* Ambient Orbs in Light Mode */
+html.light .orb-gold {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, transparent 70%) !important;
+}
+html.light .orb-violet {
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.1) 0%, transparent 70%) !important;
+}
+
+/* Page containers with hardcoded dark gradients in inline styles */
+html.light [style*="#05020c"],
+html.light [style*="#050010"],
+html.light [style*="#060210"],
+html.light [style*="#1a0730"],
+html.light [style*="#1a0b30"],
+html.light [style*="#15062c"],
+html.light [style*="#090314"],
+html.light [style*="#0d1238"],
+html.light [style*="#0e061e"],
+html.light [style*="#0f0520"],
+html.light [style*="#1b0a33"],
+html.light [style*="#16082e"] {
+  background: radial-gradient(ellipse at 50% 0%, #fef3c7 0%, #faf5ee 40%, #f3ece0 100%) !important;
+  color: #1e112a !important;
+}
+
+/* Luxury Cards & Panels in Light Mode */
+html.light .card-luxury {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(217, 119, 6, 0.22) !important;
+  box-shadow: 0 16px 40px -12px rgba(180, 83, 9, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  color: #1e112a !important;
+}
+
+html.light .card-luxury:hover {
+  border-color: rgba(217, 119, 6, 0.45) !important;
+  box-shadow: 0 24px 50px -10px rgba(180, 83, 9, 0.14), 0 0 25px rgba(245, 158, 11, 0.1) !important;
+}
+
+html.light .glass,
+html.light .glass-dark {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(217, 119, 6, 0.2) !important;
+  box-shadow: 0 8px 30px rgba(180, 83, 9, 0.06) !important;
+  color: #1e112a !important;
+}
+
+html.light .glass-gold {
+  background: rgba(254, 243, 199, 0.65) !important;
+  border: 1px solid rgba(217, 119, 6, 0.35) !important;
+  color: #451a03 !important;
+}
+
+/* Header in Light Mode */
+html.light header {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(28px) !important;
+  -webkit-backdrop-filter: blur(28px) !important;
+  border-bottom: 1px solid rgba(217, 119, 6, 0.22) !important;
+  box-shadow: 0 4px 20px rgba(180, 83, 9, 0.08) !important;
+}
+
+html.light header nav a {
+  color: #374151 !important;
+}
+
+html.light header nav a:hover {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #1e112a !important;
+}
+
+/* Inputs, Selects, and Textareas in Light Mode */
+html.light .input-luxury,
+html.light input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #1e112a !important;
+  border: 1px solid rgba(217, 119, 6, 0.35) !important;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.05) !important;
+}
+
+html.light .input-luxury:focus,
+html.light input:focus,
+html.light select:focus,
+html.light textarea:focus {
+  border-color: #d97706 !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22), 0 0 15px rgba(245, 158, 11, 0.1) !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: rgba(107, 33, 168, 0.5) !important;
+}
+
+html.light select option,
+html.light select optgroup {
+  background-color: #ffffff !important;
+  color: #1e112a !important;
+}
+
+/* Typography Overrides in Light Mode */
+html.light .text-white {
+  color: #1e112a !important;
+}
+
+html.light h1:not([style*="-webkit-background-clip"]):not([style*="background-clip"]),
+html.light h2:not([style*="-webkit-background-clip"]):not([style*="background-clip"]),
+html.light h3:not([style*="-webkit-background-clip"]):not([style*="background-clip"]),
+html.light h4:not([style*="-webkit-background-clip"]):not([style*="background-clip"]) {
+  color: #1e112a !important;
+}
+
+/* Purple text adjustments for crisp readability on light backgrounds */
+html.light [class*="text-purple-200"],
+html.light [class*="text-purple-300"],
+html.light [class*="text-purple-400"] {
+  color: #581c87 !important;
+}
+
+/* Amber text adjustments */
+html.light [class*="text-amber-200"],
+html.light [class*="text-amber-300"] {
+  color: #92400e !important;
+}
+
+html.light [class*="text-amber-400"] {
+  color: #b45309 !important;
+}
+
+html.light [class*="text-white/"] {
+  color: #374151 !important;
+}
+
+/* Generic dark semi-transparent backgrounds to crisp white */
+html.light [class*="bg-white/[0.0"],
+html.light [class*="bg-white/5"],
+html.light [class*="bg-white/10"],
+html.light [class*="bg-white/15"],
+html.light [class*="bg-black/"],
+html.light [class*="bg-white/20"] {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  border-color: rgba(217, 119, 6, 0.2) !important;
+}
+
+html.light [class*="border-white/"] {
+  border-color: rgba(217, 119, 6, 0.2) !important;
+}
+
+/* Modals & Dialogs in Light Mode */
+html.light [class*="fixed inset-0"] {
+  background: rgba(15, 5, 25, 0.45) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+html.light [class*="fixed inset-0"] > div {
+  background: #ffffff !important;
+  border: 1px solid rgba(217, 119, 6, 0.3) !important;
+  box-shadow: 0 25px 60px rgba(180, 83, 9, 0.18) !important;
+  color: #1e112a !important;
+}
+
+/* Buttons in Light Mode */
+html.light .btn-glass {
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: #451a03 !important;
+  border-color: rgba(217, 119, 6, 0.35) !important;
+  box-shadow: 0 4px 15px rgba(180, 83, 9, 0.08) !important;
+}
+
+html.light .btn-glass:hover {
+  background: #ffffff !important;
+  border-color: #d97706 !important;
+  box-shadow: 0 8px 25px rgba(180, 83, 9, 0.15) !important;
+}
+
+/* Badges in Light Mode */
+html.light .badge-pill {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-color: rgba(217, 119, 6, 0.35) !important;
+  color: #92400e !important;
+}
+
+html.light .divider-line {
+  background: linear-gradient(90deg, transparent, rgba(217, 119, 6, 0.35), transparent) !important;
+}
+
+html.light [class*="divide-white/"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(217, 119, 6, 0.18) !important;
+}
+
+/* Calendar Day Tiles in DashBoard */
+html.light [class*="min-h-[100px]"] {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(217, 119, 6, 0.18) !important;
+  box-shadow: 0 2px 6px rgba(180, 83, 9, 0.04) !important;
+}

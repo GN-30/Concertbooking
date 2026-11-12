@@ -5,6 +5,7 @@ import { gsap } from 'gsap';
 import auth from '../services/auth';
 import { getCurrentUser, setCurrentUserObj } from '../services/api';
 import CalendarPrivacyModal from './CalendarPrivacyModal';
+import { useTheme } from '../context/ThemeContext';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', icon: '🏠' },
@@ -21,6 +22,7 @@ export default function Header() {
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const navigate = useNavigate();
   const headerRef = useRef(null);
+  const { isLight, toggleTheme } = useTheme();
 
   useEffect(() => {
     setUser(getCurrentUser());
@@ -226,6 +228,20 @@ export default function Header() {
                 </button>
               );
             })()}
+
+            {/* Theme Toggle Button — Desktop */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={isLight ? 'Switch to Dark Theme' : 'Switch to Light Theme'}
+              className="flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-300 hover:scale-110 cursor-pointer flex-shrink-0"
+              style={{
+                background: isLight ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.08)',
+                border: isLight ? '1px solid rgba(217,119,6,0.4)' : '1px solid rgba(255,255,255,0.14)',
+              }}
+            >
+              <span className="text-base">{isLight ? '🌙' : '☀️'}</span>
+            </button>
           </nav>
 
           {/* Auth Section */}
@@ -386,6 +402,19 @@ export default function Header() {
                   style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
                 >
                   Sign Out
+                </button>
+                {/* Theme Toggle Button — Mobile */}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  title={isLight ? 'Switch to Dark' : 'Switch to Light'}
+                  className="flex items-center justify-center w-8 h-8 rounded-xl cursor-pointer transition-all duration-300 hover:scale-110 flex-shrink-0"
+                  style={{
+                    background: isLight ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.08)',
+                    border: isLight ? '1px solid rgba(217,119,6,0.4)' : '1px solid rgba(255,255,255,0.14)',
+                  }}
+                >
+                  <span className="text-sm">{isLight ? '🌙' : '☀️'}</span>
                 </button>
               </div>
             </div>
